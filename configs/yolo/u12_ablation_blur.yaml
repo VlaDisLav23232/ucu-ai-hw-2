@@ -1,0 +1,17 @@
+# U1.2 Ignore-Policy Ablation Arm 1: Gaussian blur fill (k=10 subset -> stride 2 on k=5 cache)
+unit: "U1.2"
+family: "yolo"
+exp: "u12_blur"
+hypothesis: "Soft-edged GT-protected Gaussian blur inside ignore regions prevents false-negative supervision without creating hard grey borders."
+
+model: "yolo11n.pt"
+cache: "k5_blur_L1920"
+train_subset_stride: 2         # k=10 effective frame step (~2,434 train frames)
+imgsz: 1280
+batch: 4                       # Safe on both 6 GB RTX 4050 and 16 GB T4 for YOLO11n @ 1280
+epochs: 40
+time_budget_h: 0.45            # 27 min budget per §10 U1.2
+close_mosaic: 3
+workers: 4
+auto_eval_val: true
+

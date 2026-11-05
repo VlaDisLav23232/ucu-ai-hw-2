@@ -1,0 +1,16 @@
+{
+  "blur": {
+    "AP": 0.187267,
+    "AP50": 0.36985,
+    "APs": 0.0952,
+    "border_ring_pct": 3.064
+  },
+  "drop": {
+    "AP": 0.191195,
+    "AP50": 0.371239,
+    "APs": 0.089002,
+    "border_ring_pct": 2.22
+  },
+  "winner": "drop",
+  "figure": "/home/marko/ucu-ai-hw-2/images/ignore_ablation.png"
+}

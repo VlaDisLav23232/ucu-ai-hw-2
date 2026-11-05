@@ -1,0 +1,16 @@
+# U1.3 / F3 Baseline (yolo-e0): YOLO11s under fixed Protocol P0 (1280 long side, 1.5 GPU-h budget)
+unit: "F3"
+family: "yolo"
+exp: "e0"
+hypothesis: "Anchor-free YOLO11s baseline under Protocol P0 (k=5, imgsz=1280, 1.5 GPU-h budget)."
+
+model: "yolo11s.pt"
+cache: "k5_drop_L1920"
+imgsz: 1280
+batch: 8                       # On 6 GB RTX 4050, pass `--batch 2` on the CLI
+epochs: 50
+time_budget_h: 1.5
+close_mosaic: 2
+workers: 4
+auto_eval_val: true
+

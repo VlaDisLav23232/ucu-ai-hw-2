@@ -1,0 +1,19 @@
+# U1.1 Local Smoke Test: overfit 20 train images on RTX 4050 (imgsz=640, batch=2)
+unit: "U1.1"
+family: "yolo"
+exp: "smoke"
+hypothesis: "Verify end-to-end training, adapter, prediction, evaluator, and submission pipeline by overfitting 20 train frames locally."
+
+model: "yolo11n.pt"
+cache: "k5_blur_L1920"
+max_train_images: 20
+val_on_train: true
+imgsz: 640
+batch: 2
+epochs: 60
+time_budget_h: 0.12
+close_mosaic: 10
+mosaic: 0.0
+workers: 2
+auto_eval_val: false
+

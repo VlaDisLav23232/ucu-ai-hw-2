@@ -1,0 +1,38 @@
+# Environments & Python artifacts
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Competition data, caches, checkpoints, framework outputs, submissions
+data/
+cache/
+runs/
+checkpoints/
+submissions/
+
+# Weights & large binaries
+*.pt
+*.pth
+*.onnx
+*.engine
+*.ckpt
+
+# Large full prediction tables (keep slim predictions in experiments/runs/)
+*.parquet
+!experiments/runs/**/*slim*.parquet
+
+# OS / WSL artifacts
+*:Zone.Identifier
+.DS_Store
+Thumbs.db
+

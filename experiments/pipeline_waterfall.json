@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "stage": "F3 Baseline\n(YOLO11s @1280)",
+      "AP": 0.206703
+    },
+    {
+      "stage": "+ Hi-Res 1600\n(yolo-e1)",
+      "AP": 0.218362
+    },
+    {
+      "stage": "F4 Query-Based\n(RT-DETR-L)",
+      "AP": 0.265358
+    },
+    {
+      "stage": "+ Multi-Model\nWBF Ensemble",
+      "AP": 0.290166
+    },
+    {
+      "stage": "+ Tracklet\nScore Smoothing",
+      "AP": 0.299677
+    },
+    {
+      "stage": "+ Gap\nPropagation",
+      "AP": 0.299962
+    }
+  ]
+}

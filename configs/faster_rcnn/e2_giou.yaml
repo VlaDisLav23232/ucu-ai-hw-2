@@ -1,0 +1,56 @@
+# F1 Exp B (frcnn-e2): Replacing Smooth-L1 RoI box regression loss with GIoU on decoded boxes (§10 F1)
+run_id: "frcnn-e2"
+unit: "F1"
+family: "faster_rcnn"
+exp: "e2"
+parent_run: "frcnn-e1"
+hypothesis: "Replacing Smooth-L1 RoI regression loss with scale-invariant GIoU loss on decoded boxes directly optimizes IoU across multi-scale aerial targets and improves AP75 and overall AP."
+seed: 42
+
+cache: "k5_drop_L1920"
+k: 5
+imgsz: 1280
+min_size: 720
+max_size: 1280
+num_classes: 9
+trainable_backbone_layers: 3
+
+batch: 4
+workers: 4
+epochs: 8
+time_budget_h: 1.5
+optimizer: "sgd"
+lr: 0.005
+momentum: 0.9
+weight_decay: 0.0001
+warmup_epochs: 1.0
+grad_clip_norm: 10.0
+
+rpn_pre_nms_top_n_train: 4000
+rpn_pre_nms_top_n_test: 2000
+rpn_post_nms_top_n_train: 2000
+rpn_post_nms_top_n_test: 2000
+box_batch_size_per_image: 1024
+box_positive_fraction: 0.33
+rpn_anchor_sizes:
+  - [16]
+  - [32]
+  - [64]
+  - [128]
+  - [256]
+roi_box_loss: "giou"
+
+augmentation:
+  hflip: 0.5
+  scale_min: 0.5
+  scale_max: 1.0
+  hsv_h: 0.015
+  hsv_s: 0.4
+  hsv_v: 0.3
+
+inference:
+  conf_thresh: 0.001
+  nms_iou: 0.6
+  max_det: 500
+  slim_conf_thresh: 0.05
+

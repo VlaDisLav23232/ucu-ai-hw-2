@@ -1,0 +1,38 @@
+# F3 Exp B (yolo-e2): CIoU + Normalized Wasserstein Distance (NWD) box loss blend (§10 F3)
+run_id: "yolo-e2"
+unit: "F3"
+family: "yolo"
+exp: "e2"
+parent_run: "yolo-e0"
+hypothesis: "Blending CIoU with Normalized Wasserstein Distance (lambda_nwd=0.5, C=24.0 px fitted to mean 1280-scale box size) stabilizes regression gradients for tiny objects (<32^2 px)."
+seed: 42
+
+cache: "k5_drop_L1920"
+k: 5
+model: "yolo11s.pt"
+imgsz: 1280
+batch: 8
+epochs: 30
+time_budget_h: 1.5
+close_mosaic: 2
+workers: 4
+
+loss_type: "ciou_nwd"
+lambda_nwd: 0.5
+nwd_c: 24.0
+
+augmentation:
+  hflip: 0.5
+  vflip: 0.0
+  degrees: 0.0
+  scale_min: 0.5
+  hsv_h: 0.015
+  hsv_s: 0.4
+  hsv_v: 0.3
+
+inference:
+  conf_thresh: 0.001
+  nms_iou: 0.6
+  max_det: 500
+  slim_conf_thresh: 0.05
+

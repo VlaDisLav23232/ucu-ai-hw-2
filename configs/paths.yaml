@@ -1,0 +1,31 @@
+# Per-environment path configuration (§5, §8.1)
+# Environment variables VDET_DATA, VDET_CACHE, VDET_RUNS, VDET_CKPT, VDET_SUBS
+# always take precedence over the defaults below.
+
+local_wsl:
+  data: "data"
+  cache: "cache"
+  runs: "runs"
+  ckpt: "checkpoints"
+  subs: "submissions"
+  experiments: "experiments"
+  images: "images"
+
+kaggle:
+  data: "/kaggle/input/multiple-object-video-detection-hw-2-ucu-ai-2026"
+  cache: "/kaggle/working/cache"
+  runs: "/kaggle/working/runs"
+  ckpt: "/kaggle/working/checkpoints"
+  subs: "/kaggle/working/submissions"
+  experiments: "experiments"
+  images: "images"
+
+colab:
+  data: "/content/data"
+  cache: "/content/cache"
+  runs: "/content/runs"
+  ckpt: "/content/drive/MyDrive/vdet/checkpoints"
+  subs: "/content/submissions"
+  experiments: "experiments"
+  images: "images"
+
