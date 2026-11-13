@@ -176,7 +176,7 @@ def _run_coco_eval_core(
         "AR500": _clean(stats[8]),
         "ARs": _clean(stats[9]),
         "ARm": _clean(stats[10]),
-        "APl": _clean(stats[11]),
+        "ARl": _clean(stats[11]),
     }
 
     # Extract per-class AP@[0.50:0.95] at areaRng='all' (index 0) and maxDets=max_det_cap (index -1)
@@ -218,7 +218,8 @@ def evaluate(
     subset : Sequence[str] | set[str] | None
         Optional list/set of `image_key` strings to restrict evaluation to a subset.
     max_dets : Sequence[int]
-        COCO `maxDets` parameter; defaults to `[1, 10, 500]` per     backend : str
+        COCO `maxDets` parameter; defaults to `[1, 10, 500]` (Kaggle scores up to 500 detections per image).
+    backend : str
         `'faster_coco_eval'` (default) or `'pycocotools'`.
     per_res_bucket : bool
         If True, also compute AP/AP50/APs per resolution bucket (`res_bucket`).

@@ -6,3 +6,4 @@ rtdetr-e1,rtdetr-e1.csv,0.2681831718,2026-11-05,RT-DETR-L 600 queries
 ensemble-wbf,ensemble_wbf.csv,0.3028529310,2026-11-05,6-model WBF ensemble
 pipeline-final,pipeline_test.csv,0.3183880835,2026-11-05,6-model WBF + temporal; uploaded as pipeline_test.csv (run inferred from date and score order)
 pipeline-night-boost,pipeline_test_2.csv,0.3372810891,2026-11-06,12-input WBF + temporal (boosted pipeline); uploaded as pipeline_test_2.csv (run inferred from date and score order)
+pipeline-v3,pipeline_v3.csv,0.3270412637,2026-11-13,15-input WBF (v2 + 3 Faster R-CNN) + temporal; better on val than pipeline-night-boost but lower public LB

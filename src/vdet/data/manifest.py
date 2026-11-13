@@ -213,7 +213,8 @@ def _process_annotated_split(
                 float(ann["bbox"][2]),
                 float(ann["bbox"][3]),
             )
-            # Clip to [0, width] x [0, height] per             x2 = min(float(width), max(0.0, bx + bw))
+            # Clip to [0, width] x [0, height]
+            x2 = min(float(width), max(0.0, bx + bw))
             y2 = min(float(height), max(0.0, by + bh))
             bx = min(float(width), max(0.0, bx))
             by = min(float(height), max(0.0, by))
