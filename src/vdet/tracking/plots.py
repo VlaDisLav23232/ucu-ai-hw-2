@@ -1,4 +1,4 @@
-"""Experiment diagnostic and report plotting utilities (§9.4, U0.7)."""
+"""Experiment diagnostic and report plotting utilities."""
 
 from __future__ import annotations
 
@@ -190,7 +190,7 @@ def per_class_ap(
 def pipeline_waterfall(
     steps: list[tuple[str, float]],
     out_path: str | Path,
-    title: str = "M4 Pipeline Progression (Holdout Val mAP@[0.50:0.95])",
+    title: str = "Pipeline Progression (Holdout Val mAP@[0.50:0.95])",
 ) -> Path:
     """Plot step-by-step waterfall bar chart of holdout AP gains (`pipeline_waterfall.png`)."""
     fig, ax = plt.subplots(figsize=(7.8, 4.2))

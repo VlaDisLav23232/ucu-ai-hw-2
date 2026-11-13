@@ -1,4 +1,4 @@
-"""K-means anchor fitting (1 - IoU distance) on 1280-scale train boxes for RetinaNet / Faster R-CNN (§10 F1/F2)."""
+"""K-means anchor fitting (1 - IoU distance) on 1280-scale train boxes for RetinaNet / Faster R-CNN."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ def fit_kmeans_anchors(
     """Fit 5 FPN levels x 3 sizes x 3 aspect ratios via k-means (1 - IoU distance) on 1280-scale train boxes.
 
     Keeps `scales_per_level * ratios_per_level = 9` anchors per spatial location so
-    COCO-pretrained RetinaNet v2 head weights remain shape-compatible (§10 F2-E1).
+    COCO-pretrained RetinaNet v2 head weights remain shape-compatible.
     """
     cache_yaml = P.cache / f"kmeans_anchors_L{int(target_long_side)}.yaml"
     if use_cached_yaml and cache_yaml.exists() and boxes_df is None:

@@ -1,0 +1,86 @@
+protocol_id: P0
+seed: 42
+data:
+  train_split: train
+  holdout_split: val
+  frame_step_k: 5
+  val_proxy_k: 5
+  ignore_policy: drop
+  cache_long_side: 1920
+  cache_name: k5_drop_L1920
+  jpeg_quality: 95
+input:
+  imgsz: 1280
+  min_size: 720
+  max_size: 1280
+training:
+  pretrained: coco
+  time_budget_h: 1.5
+  warmup_epochs: 1.0
+  close_mosaic_frac: 0.1
+augmentation:
+  hflip: 0.5
+  vflip: 0.0
+  degrees: 0.0
+  scale_min: 0.5
+  scale_max: 1.0
+  hsv_h: 0.015
+  hsv_s: 0.4
+  hsv_v: 0.3
+inference:
+  conf_thresh: 0.001
+  slim_conf_thresh: 0.05
+  nms_iou: 0.6
+  max_det: 500
+  imgsz: 1280
+evaluation:
+  evaluator: faster-coco-eval
+  iou_thresholds:
+  - 0.5
+  - 0.55
+  - 0.6
+  - 0.65
+  - 0.7
+  - 0.75
+  - 0.8
+  - 0.85
+  - 0.9
+  - 0.95
+  max_dets:
+  - 1
+  - 10
+  - 500
+  size_buckets:
+    small:
+    - 0
+    - 1024
+    medium:
+    - 1024
+    - 9216
+    large:
+    - 9216
+    - 10000000000
+fps_benchmark:
+  device: cuda
+  batch_size: 1
+  fp16: true
+  imgsz: 1280
+  warmup_frames: 20
+  timed_frames: 200
+  exclude_jpeg_decode: true
+family: yolo
+parent_run: yolo-e1
+cache: k5_drop_L1920
+k: 5
+imgsz: 1280
+batch: 2
+epochs: 30
+time_budget_h: 1.5
+close_mosaic: 2
+workers: 4
+warmup_epochs: 0.5
+run_id: yolo11s-p3p5-ablation
+exp: abl_p3p5
+model: /home/marko/ucu-ai-hw-2/checkpoints/yolo-e1_best.pt
+hypothesis: 'Control arm of the P2 ablation: continue training yolo-e1 (standard P3-P5
+  heads) under the ablation protocol.'

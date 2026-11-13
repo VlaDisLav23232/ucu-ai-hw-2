@@ -1,0 +1,20 @@
+models:
+- yolo-e0
+- yolo-e1
+- yolo-e2
+- rtdetr-e0
+- rtdetr-e1
+- rtdetr-e2
+weights:
+- 1.0
+- 1.5
+- 0.8
+- 2.5
+- 2.2
+- 1.8
+use_class_wbf: false
+method: wbf
+iou_thr: 0.55
+skip_box_thr: 0.001
+conf_type: avg
+max_det: 500

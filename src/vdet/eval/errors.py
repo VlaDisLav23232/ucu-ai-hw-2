@@ -1,4 +1,4 @@
-"""TIDE-style error breakdown (Cls, Loc, Both, Dupe, Bkg, Miss) and failure gallery miner (§10 U5.1).
+"""TIDE-style error breakdown (Cls, Loc, Both, Dupe, Bkg, Miss) and failure gallery miner.
 
 Credits: Error taxonomy follows Bolya et al., "TIDE: A General Toolbox for Identifying Object Detection Errors", ECCV 2020.
 """
@@ -47,7 +47,7 @@ def filter_ignore_predictions(
     ignore_df: pd.DataFrame | None = None,
     ioa_thresh: float = 0.50,
 ) -> pd.DataFrame:
-    """Remove predictions whose area overlaps any `iscrowd=1` ignore region by `>= ioa_thresh` (§10 U5.1)."""
+    """Remove predictions whose area overlaps any `iscrowd=1` ignore region by `>= ioa_thresh`."""
     if preds_df.empty:
         return preds_df
     ign_df = ignore_df if ignore_df is not None else load_ignore()

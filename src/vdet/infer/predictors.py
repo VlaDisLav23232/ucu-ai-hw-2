@@ -1,4 +1,4 @@
-"""Base Predictor interface, coordinate unscaling helpers, and prediction table I/O (§2.4, §6.3, U0.6)."""
+"""Base Predictor interface, coordinate unscaling helpers, and prediction table I/O."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ PREDICTION_COLUMNS: tuple[str, ...] = ("image_key", "cls", "score", "x", "y", "w
 
 
 def empty_predictions_df(include_optional: bool = False) -> pd.DataFrame:
-    """Create an empty prediction DataFrame conforming to the §6.3 schema."""
+    """Create an empty prediction DataFrame conforming to the schema."""
     data = {
         "image_key": pd.Series(dtype="object"),
         "cls": pd.Series(dtype="int8"),
@@ -37,7 +37,7 @@ def clip_and_filter_boxes_xywh(
     orig_h: int | float,
     min_size: float = 1e-3,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Clip [N, 4] top-left (x, y, w, h) boxes to [0, orig_w] x [0, orig_h] and return valid mask (§2.4)."""
+    """Clip [N, 4] top-left (x, y, w, h) boxes to [0, orig_w] x [0, orig_h] and return valid mask."""
     if len(boxes_xywh) == 0:
         return np.zeros((0, 4), dtype=np.float32), np.zeros(0, dtype=bool)
 
@@ -116,7 +116,7 @@ def normalize_predictions_df(
     conf_thresh: float = 0.001,
     max_det_per_image: int = MAX_SUBMISSION_DETS,
 ) -> pd.DataFrame:
-    """Enforce §6.3 column types, filter invalid boxes/scores, sort descending, and cap per image."""
+    """Enforce column types, filter invalid boxes/scores, sort descending, and cap per image."""
     if df is None or df.empty:
         return empty_predictions_df()
 
@@ -162,7 +162,7 @@ def save_predictions_parquet(
     conf_thresh: float = 0.001,
     max_det_per_image: int = MAX_SUBMISSION_DETS,
 ) -> Path:
-    """Normalize and write a prediction DataFrame to a zstd-compressed Parquet file (§6.3)."""
+    """Normalize and write a prediction DataFrame to a zstd-compressed Parquet file."""
     p = Path(out_path)
     p.parent.mkdir(parents=True, exist_ok=True)
     clean_df = normalize_predictions_df(
@@ -173,15 +173,15 @@ def save_predictions_parquet(
 
 
 def load_predictions_parquet(path: str | Path) -> pd.DataFrame:
-    """Load a prediction table Parquet file (§6.3)."""
+    """Load a prediction table Parquet file."""
     return pd.read_parquet(Path(path))
 
 
 class Predictor(ABC):
-    """Abstract base interface for all frame-level object detectors (§5, §6.3, U0.6)."""
+    """Abstract base interface for all frame-level object detectors."""
 
     @abstractmethod
     def predict(self, frames: pd.DataFrame | Sequence[str]) -> pd.DataFrame:
-        """Predict bounding boxes on original images and return a §6.3 prediction DataFrame."""
+        """Predict bounding boxes on original images and return a prediction DataFrame."""
         raise NotImplementedError
 

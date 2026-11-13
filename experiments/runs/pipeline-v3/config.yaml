@@ -1,0 +1,276 @@
+run_id: pipeline-v3
+wbf_run_id: ensemble-wbf-v3
+rescore_run_id: temporal-rescore-v3
+wbf_sub_name: ensemble_wbf_v3.csv
+final_sub_name: pipeline_v3.csv
+family: pipeline
+exp: v3
+parent_run: pipeline-night-boost
+seed: 42
+hypothesis: Pipeline v2 plus the three Faster R-CNN models (second model family) with
+  the same class-aware-WBF selection and temporal settings.
+models:
+- run_id: rtdetr-e3-ft
+  weights: checkpoints/rtdetr-e3-ft_best.pt
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 3.2
+- run_id: rtdetr-e3-tta
+  base_run_id: rtdetr-e3-ft
+  weights: checkpoints/rtdetr-e3-ft_best.pt
+  imgsz: 1280
+  batch: 2
+  tta: true
+  tta_scales:
+  - 1.0
+  - 1.15
+  tta_hflip: true
+  hflip_only_at_base_scale: true
+  wbf_weight: 3.5
+- run_id: yolo11m-e3
+  weights: checkpoints/yolo11m-e3_best.pt
+  imgsz: 1600
+  batch: 2
+  wbf_weight: 2.2
+- run_id: yolo11m-e3-tta
+  base_run_id: yolo11m-e3
+  weights: checkpoints/yolo11m-e3_best.pt
+  imgsz: 1600
+  batch: 2
+  tta: true
+  tta_scales:
+  - 1.0
+  - 1.15
+  tta_hflip: true
+  hflip_only_at_base_scale: true
+  wbf_weight: 2.5
+- run_id: yolo11s-p2
+  weights: checkpoints/yolo11s-p2_best.pt
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 1.8
+- run_id: yolo-e1-tiled
+  base_run_id: yolo-e1
+  weights: checkpoints/yolo-e1_best.pt
+  imgsz: 1280
+  batch: 4
+  tiling: true
+  slice_size: 960
+  overlap: 0.25
+  upscale_small_frames: true
+  wbf_weight: 1.8
+- run_id: rtdetr-e0
+  weights: checkpoints/rtdetr-e0_best.pt
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 2.5
+- run_id: rtdetr-e1
+  weights: checkpoints/rtdetr-e1_best.pt
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 2.2
+- run_id: rtdetr-e2
+  weights: checkpoints/rtdetr-e2_best.pt
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 1.8
+- run_id: yolo-e1
+  weights: checkpoints/yolo-e1_best.pt
+  imgsz: 1600
+  batch: 2
+  wbf_weight: 1.5
+- run_id: yolo-e0
+  weights: checkpoints/yolo-e0_best.pt
+  imgsz: 1280
+  batch: 4
+  wbf_weight: 1.0
+- run_id: yolo-e2
+  weights: checkpoints/yolo-e2_best.pt
+  imgsz: 1280
+  batch: 4
+  wbf_weight: 0.8
+- run_id: frcnn-e0
+  weights: checkpoints/frcnn-e0_best.pth
+  config:
+    seed: 42
+    cache: k5_drop_L1920
+    k: 5
+    imgsz: 1280
+    min_size: 720
+    max_size: 1280
+    num_classes: 9
+    trainable_backbone_layers: 3
+    batch: 2
+    workers: 2
+    epochs: 8
+    time_budget_h: 1.5
+    optimizer: sgd
+    lr: 0.005
+    momentum: 0.9
+    weight_decay: 0.0001
+    warmup_epochs: 1.0
+    grad_clip_norm: 10.0
+    augmentation:
+      hflip: 0.5
+      scale_min: 0.5
+      scale_max: 1.0
+      hsv_h: 0.015
+      hsv_s: 0.4
+      hsv_v: 0.3
+    inference:
+      conf_thresh: 0.001
+      nms_iou: 0.6
+      max_det: 500
+      slim_conf_thresh: 0.05
+    run_id: frcnn-e0
+    family: faster_rcnn
+    exp: e0
+    parent_run: ''
+    hypothesis: COCO-pretrained Faster R-CNN ResNet50-FPN v2 baseline (min_size=720,
+      max_size=1280, 500 dets/img, 1.5 GPU-h budget).
+    rpn_pre_nms_top_n_train: 2000
+    rpn_pre_nms_top_n_test: 1000
+    rpn_post_nms_top_n_train: 2000
+    rpn_post_nms_top_n_test: 1000
+    box_batch_size_per_image: 512
+    box_positive_fraction: 0.25
+    roi_box_loss: smooth_l1
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 1.5
+- run_id: frcnn-e1
+  weights: checkpoints/frcnn-e1_best.pth
+  config:
+    seed: 42
+    cache: k5_drop_L1920
+    k: 5
+    imgsz: 1280
+    min_size: 720
+    max_size: 1280
+    num_classes: 9
+    trainable_backbone_layers: 3
+    batch: 2
+    workers: 2
+    epochs: 8
+    time_budget_h: 1.5
+    optimizer: sgd
+    lr: 0.005
+    momentum: 0.9
+    weight_decay: 0.0001
+    warmup_epochs: 1.0
+    grad_clip_norm: 10.0
+    augmentation:
+      hflip: 0.5
+      scale_min: 0.5
+      scale_max: 1.0
+      hsv_h: 0.015
+      hsv_s: 0.4
+      hsv_v: 0.3
+    inference:
+      conf_thresh: 0.001
+      nms_iou: 0.6
+      max_det: 500
+      slim_conf_thresh: 0.05
+    run_id: frcnn-e1
+    family: faster_rcnn
+    exp: e1
+    parent_run: frcnn-e0
+    hypothesis: Doubling RPN pre/post-NMS proposals and expanding RoI batch size to
+      1024 (positive_fraction=0.33) with halved base anchor sizes (16..256 px) prevents
+      RPN proposal starvation on crowded aerial frames.
+    rpn_pre_nms_top_n_train: 4000
+    rpn_pre_nms_top_n_test: 2000
+    rpn_post_nms_top_n_train: 2000
+    rpn_post_nms_top_n_test: 2000
+    box_batch_size_per_image: 1024
+    box_positive_fraction: 0.33
+    roi_box_loss: smooth_l1
+    rpn_anchor_sizes:
+    - - 16
+    - - 32
+    - - 64
+    - - 128
+    - - 256
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 1.5
+- run_id: frcnn-e2
+  weights: checkpoints/frcnn-e2_best.pth
+  config:
+    seed: 42
+    cache: k5_drop_L1920
+    k: 5
+    imgsz: 1280
+    min_size: 720
+    max_size: 1280
+    num_classes: 9
+    trainable_backbone_layers: 3
+    batch: 2
+    workers: 2
+    epochs: 8
+    time_budget_h: 1.5
+    optimizer: sgd
+    lr: 0.005
+    momentum: 0.9
+    weight_decay: 0.0001
+    warmup_epochs: 1.0
+    grad_clip_norm: 10.0
+    augmentation:
+      hflip: 0.5
+      scale_min: 0.5
+      scale_max: 1.0
+      hsv_h: 0.015
+      hsv_s: 0.4
+      hsv_v: 0.3
+    inference:
+      conf_thresh: 0.001
+      nms_iou: 0.6
+      max_det: 500
+      slim_conf_thresh: 0.05
+    run_id: frcnn-e2
+    family: faster_rcnn
+    exp: e2
+    parent_run: frcnn-e1
+    hypothesis: Replacing Smooth-L1 RoI regression loss with scale-invariant GIoU
+      loss on decoded boxes directly optimizes IoU across multi-scale aerial targets
+      and improves AP75 and overall AP.
+    rpn_pre_nms_top_n_train: 4000
+    rpn_pre_nms_top_n_test: 2000
+    rpn_post_nms_top_n_train: 2000
+    rpn_post_nms_top_n_test: 2000
+    box_batch_size_per_image: 1024
+    box_positive_fraction: 0.33
+    roi_box_loss: giou
+    rpn_anchor_sizes:
+    - - 16
+    - - 32
+    - - 64
+    - - 128
+    - - 256
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 1.5
+fusion:
+  method: wbf
+  iou_thr: 0.55
+  skip_box_thr: 0.001
+  conf_type: avg
+  max_det: 500
+  auto_select_class_wbf: true
+temporal:
+  method: rescore
+  iou_link: 0.45
+  alpha: 0.7
+  topk_ratio: 0.5
+  enable_propagation: true
+  prop_min_score: 0.25
+  prop_min_len: 3
+  max_gap: 2
+  gap_decay: 0.85
+  single_frame_decay: 0.96
+  use_velocity: true
+  small_box_bonus: 0.0
+  smooth_boxes: true
+  box_smooth_weight: 0.16
+use_class_wbf: false
+use_smooth_boxes: true

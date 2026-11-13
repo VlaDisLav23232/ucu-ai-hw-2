@@ -1,0 +1,45 @@
+seed: 42
+cache: k5_drop_L1920
+k: 5
+imgsz: 1280
+min_size: 720
+max_size: 1280
+num_classes: 9
+trainable_backbone_layers: 3
+batch: 2
+workers: 2
+epochs: 8
+time_budget_h: 1.5
+optimizer: sgd
+lr: 0.005
+momentum: 0.9
+weight_decay: 0.0001
+warmup_epochs: 1.0
+grad_clip_norm: 10.0
+augmentation:
+  hflip: 0.5
+  scale_min: 0.5
+  scale_max: 1.0
+  hsv_h: 0.015
+  hsv_s: 0.4
+  hsv_v: 0.3
+inference:
+  conf_thresh: 0.001
+  nms_iou: 0.6
+  max_det: 500
+  slim_conf_thresh: 0.05
+run_id: retina-e3
+family: retinanet
+exp: e3
+parent_run: retina-e0
+hypothesis: 'Exp B alone: relaxed matcher IoU thresholds 0.4/0.3, focal gamma=1.5,
+  alpha=0.25 and GIoU box regression with the default COCO anchors. Added after retina-e1
+  showed that the k-means anchors hurt, to separate the loss/matching effect from
+  the anchor change.'
+topk_candidates: 1000
+use_kmeans_anchors: false
+focal_alpha: 0.25
+focal_gamma: 1.5
+fg_iou_thresh: 0.4
+bg_iou_thresh: 0.3
+box_loss_type: giou

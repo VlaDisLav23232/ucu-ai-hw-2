@@ -1,4 +1,9 @@
-"""Ultralytics (YOLO11 / RT-DETR) training wrapper, custom trainers (NWD / RT-DETR), and Predictor (§7, F3, F4)."""
+"""Ultralytics (YOLO11 / RT-DETR) training wrapper, custom trainers (NWD / RT-DETR), and Predictor.
+
+Credits: Ultralytics YOLO (Jocher et al., AGPL-3.0, https://github.com/ultralytics/ultralytics); RT-DETR — Zhao et al.,
+"DETRs Beat YOLOs on Real-time Object Detection", CVPR 2024. The YOLO11s-P2 architecture (notebook 04) is adapted from
+Ultralytics' `yolov8-p2.yaml`.
+"""
 
 from __future__ import annotations
 
@@ -84,7 +89,7 @@ from ultralytics.utils.tal import bbox2dist
 
 
 class NWDBboxLoss(BboxLoss):
-    """Ultralytics `BboxLoss` subclass blending CIoU and NWD (`F3-E2`)."""
+    """Ultralytics `BboxLoss` subclass blending CIoU and NWD (yolo-e2)."""
 
     def __init__(self, reg_max: int, lambda_nwd: float = 0.5, nwd_c: float = 24.0) -> None:
         super().__init__(reg_max)
@@ -253,7 +258,7 @@ class CustomRTDETRTrainer(RTDETRTrainer):
 
 
 def make_nwd_bbox_loss(reg_max: int, lambda_nwd: float = 0.5, nwd_c: float = 24.0) -> NWDBboxLoss:
-    """Build an Ultralytics `NWDBboxLoss` instance that blends CIoU and NWD (`F3-E2`)."""
+    """Build an Ultralytics `NWDBboxLoss` instance that blends CIoU and NWD (yolo-e2)."""
     return NWDBboxLoss(reg_max, lambda_nwd=lambda_nwd, nwd_c=nwd_c)
 
 
@@ -277,7 +282,7 @@ def make_rtdetr_custom_trainer(
 
 
 class UltralyticsPredictor(Predictor):
-    """Uniform `Predictor` wrapping an Ultralytics checkpoint on original-resolution images (§6.3)."""
+    """Uniform `Predictor` wrapping an Ultralytics checkpoint on original-resolution images."""
 
     def __init__(
         self,
@@ -396,7 +401,7 @@ def train_ultralytics(
     run_id: str | None = None,
     evaluate_full_val: bool = False,
 ) -> dict[str, Any]:
-    """Train a YOLO11 or RT-DETR model under Protocol P0 and log all artifacts locally (§7, §9, F3, F4)."""
+    """Train a YOLO11 or RT-DETR model under Protocol P0 and log all artifacts locally."""
     seed = int(config.get("seed", DEFAULT_SEED))
     seed_everything(seed)
 
@@ -414,7 +419,7 @@ def train_ultralytics(
     cache_dir = P.cache / cache_name
     if not cache_dir.exists():
         raise FileNotFoundError(
-            f"Cache directory not found: {cache_dir}. Run `python scripts/build_cache.py` first."
+            f"Cache directory not found: {cache_dir}. Build it in notebooks/01_data_eda_and_cache.ipynb first."
         )
 
     train_stride = int(config.get("train_subset_stride", 1))
@@ -433,7 +438,6 @@ def train_ultralytics(
         seed=seed,
         hypothesis=str(config.get("hypothesis", "")),
         parent_run=str(config.get("parent_run", "")),
-        unit=str(config.get("unit", "U1.1")),
         family=family,
         exp=exp,
     )
@@ -482,14 +486,24 @@ def train_ultralytics(
         ultra_kwargs["time"] = float(time_budget_h)
     if device is not None:
         ultra_kwargs["device"] = device
-    if "mosaic" in config:
-        ultra_kwargs["mosaic"] = float(config["mosaic"])
+    if "mosaic" in config or "mosaic" in aug_cfg:
+        ultra_kwargs["mosaic"] = float(config.get("mosaic", aug_cfg.get("mosaic", 1.0)))
+    if "copy_paste" in config or "copy_paste" in aug_cfg:
+        ultra_kwargs["copy_paste"] = float(config.get("copy_paste", aug_cfg.get("copy_paste", 0.0)))
+    if "mixup" in config or "mixup" in aug_cfg:
+        ultra_kwargs["mixup"] = float(config.get("mixup", aug_cfg.get("mixup", 0.0)))
     if "lr0" in config:
         ultra_kwargs["lr0"] = float(config["lr0"])
+    if "lrf" in config:
+        ultra_kwargs["lrf"] = float(config["lrf"])
+    if "cos_lr" in config:
+        ultra_kwargs["cos_lr"] = bool(config["cos_lr"])
+    if "warmup_epochs" in config:
+        ultra_kwargs["warmup_epochs"] = float(config["warmup_epochs"])
     if "optimizer" in config:
         ultra_kwargs["optimizer"] = str(config["optimizer"])
 
-    # Custom trainer hooks for F3-E2 (CIoU + NWD) and F4-E2 (RT-DETR matching / denoising)
+    # Custom trainer hooks for yolo-e2 (CIoU + NWD) and rtdetr-e2 (RT-DETR matching / denoising)
     loss_type = str(config.get("loss_type", "ciou")).lower()
     lambda_nwd = float(config.get("lambda_nwd", 0.0))
     if loss_type == "ciou_nwd" or lambda_nwd > 0.0:

@@ -1,4 +1,4 @@
-"""COCO evaluation wrapper using faster-coco-eval (and pycocotools cross-check) (§3.1, §3.2, U0.5)."""
+"""COCO evaluation wrapper using faster-coco-eval (and pycocotools cross-check)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def _preds_df_to_coco_list(
     key_to_id: dict[str, int],
     max_det_per_image: int = 500,
 ) -> list[dict[str, Any]]:
-    """Convert internal prediction table (§6.3) to COCO detection list sorted by score."""
+    """Convert internal prediction table to COCO detection list sorted by score."""
     if preds_df is None or preds_df.empty:
         return []
 
@@ -28,12 +28,12 @@ def _preds_df_to_coco_list(
     if sub.empty:
         return []
 
-    # Discard invalid boxes w <= 0 or h <= 0 (§2.4)
+    # Discard invalid boxes w <= 0 or h <= 0
     sub = sub[(sub["w"] > 0.0) & (sub["h"] > 0.0) & (sub["score"] > 0.0)]
     if sub.empty:
         return []
 
-    # Sort descending by score per image and cap at max_det_per_image (§3.1)
+    # Sort descending by score per image and cap at max_det_per_image
     sub = sub.sort_values(["image_key", "score"], ascending=[True, False])
     if max_det_per_image > 0:
         sub = sub.groupby("image_key", sort=False).head(max_det_per_image)
@@ -207,7 +207,7 @@ def evaluate(
     ignore_df: pd.DataFrame | None = None,
     cache_root: Path | None = None,
 ) -> dict[str, Any]:
-    """Evaluate a prediction DataFrame (§6.3) against COCO ground truth with deduplicated crowd (§3.2).
+    """Evaluate a prediction DataFrame against COCO ground truth with deduplicated crowd.
 
     Parameters
     ----------
@@ -218,8 +218,7 @@ def evaluate(
     subset : Sequence[str] | set[str] | None
         Optional list/set of `image_key` strings to restrict evaluation to a subset.
     max_dets : Sequence[int]
-        COCO `maxDets` parameter; defaults to `[1, 10, 500]` per §3.1.
-    backend : str
+        COCO `maxDets` parameter; defaults to `[1, 10, 500]` per     backend : str
         `'faster_coco_eval'` (default) or `'pycocotools'`.
     per_res_bucket : bool
         If True, also compute AP/AP50/APs per resolution bucket (`res_bucket`).

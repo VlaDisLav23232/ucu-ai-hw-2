@@ -1,0 +1,14 @@
+{
+  "weights": "/home/marko/ucu-ai-hw-2/checkpoints/frcnn-e0_best.pth",
+  "run_id": "frcnn-e0",
+  "imgsz": 1280,
+  "batch": 1,
+  "fp16": true,
+  "warmup_frames": 20,
+  "timed_frames": 200,
+  "median_latency_ms": 79.638,
+  "mean_latency_ms": 80.114,
+  "p95_latency_ms": 83.869,
+  "fps": 12.56,
+  "gpu_type": "NVIDIA GeForce RTX 4050 Laptop GPU"
+}

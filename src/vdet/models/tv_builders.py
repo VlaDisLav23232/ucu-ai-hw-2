@@ -1,4 +1,4 @@
-"""Torchvision Faster R-CNN v2 (F1) and RetinaNet v2 (F2) model builders and Predictor (§7, §10 U2.0, F1, F2)."""
+"""Torchvision Faster R-CNN v2 and RetinaNet v2 model builders and Predictor."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def build_faster_rcnn(
     config: dict[str, Any],
     pretrained: bool = True,
 ) -> torch.nn.Module:
-    """Build `fasterrcnn_resnet50_fpn_v2` for VisDrone (8 foreground classes + 1 background = 9) (§10 F1)."""
+    """Build `fasterrcnn_resnet50_fpn_v2` for VisDrone (8 foreground classes + 1 background = 9)."""
     num_classes = int(config.get("num_classes", NUM_CLASSES + 1))
     min_size = int(config.get("min_size", 720))
     max_size = int(config.get("max_size", 1280))
@@ -79,14 +79,14 @@ def build_faster_rcnn(
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
 
-    # Optional halved RPN anchor sizes arm (§10 F1-E1) while keeping 3 aspect ratios per location
+    # Optional halved RPN anchor sizes arm while keeping 3 aspect ratios per location
     rpn_anchor_sizes = config.get("rpn_anchor_sizes", None)
     if rpn_anchor_sizes is not None:
         sizes_tuple = tuple(tuple(int(s) for s in lvl) for lvl in rpn_anchor_sizes)
         aspect_ratios = ((0.5, 1.0, 2.0),) * len(sizes_tuple)
         model.rpn.anchor_generator = AnchorGenerator(sizes=sizes_tuple, aspect_ratios=aspect_ratios)
 
-    # F1-E2: GIoU RoI box regression loss
+    # GIoU RoI box regression loss (frcnn-e2)
     if str(config.get("roi_box_loss", "smooth_l1")).lower() == "giou":
         patch_frcnn_giou_loss(model)
 
@@ -97,7 +97,7 @@ def build_retinanet(
     config: dict[str, Any],
     pretrained: bool = True,
 ) -> torch.nn.Module:
-    """Build `retinanet_resnet50_fpn_v2` for VisDrone (8 foreground classes + 1 background slot = 9) (§10 F2)."""
+    """Build `retinanet_resnet50_fpn_v2` for VisDrone (8 foreground classes + 1 background slot = 9)."""
     num_classes = int(config.get("num_classes", NUM_CLASSES + 1))
     min_size = int(config.get("min_size", 720))
     max_size = int(config.get("max_size", 1280))
@@ -133,7 +133,7 @@ def build_retinanet(
     cls_head.cls_logits = new_cls_logits
     cls_head.num_classes = num_classes
 
-    # F2-E1: K-means anchors grounded in EDA (9 anchors per location -> head shapes remain valid)
+    # K-means anchors grounded in EDA (retina-e1/e2) (9 anchors per location -> head shapes remain valid)
     if bool(config.get("use_kmeans_anchors", False)):
         anchor_cfg = config.get("kmeans_anchors", None)
         if anchor_cfg is not None and "sizes" in anchor_cfg and "aspect_ratios" in anchor_cfg:
@@ -145,7 +145,7 @@ def build_retinanet(
             aspect_ratios = fitted["aspect_ratios"]
         model.anchor_generator = AnchorGenerator(sizes=sizes, aspect_ratios=aspect_ratios)
 
-    # F2-E2: Focal Loss (alpha, gamma) & Matcher IoU thresholds (0.4 / 0.3) + optional GIoU regression
+    # Focal loss (alpha, gamma) & Matcher IoU thresholds (0.4 / 0.3) + optional GIoU regression
     if (
         "focal_alpha" in config
         or "focal_gamma" in config
@@ -179,7 +179,7 @@ def build_tv_model(
 
 
 class TorchvisionPredictor(Predictor):
-    """Uniform `Predictor` wrapping a Faster R-CNN or RetinaNet checkpoint on original-resolution images (§6.3)."""
+    """Uniform `Predictor` wrapping a Faster R-CNN or RetinaNet checkpoint on original-resolution images."""
 
     def __init__(
         self,

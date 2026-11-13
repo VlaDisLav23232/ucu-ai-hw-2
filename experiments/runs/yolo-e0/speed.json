@@ -1,0 +1,14 @@
+{
+  "weights": "checkpoints/yolo-e0_best.pt",
+  "run_id": "yolo-e0",
+  "imgsz": 1280,
+  "batch": 1,
+  "fp16": true,
+  "warmup_frames": 20,
+  "timed_frames": 200,
+  "median_latency_ms": 17.943,
+  "mean_latency_ms": 18.041,
+  "p95_latency_ms": 19.208,
+  "fps": 55.73,
+  "gpu_type": "NVIDIA GeForce RTX 4050 Laptop GPU"
+}

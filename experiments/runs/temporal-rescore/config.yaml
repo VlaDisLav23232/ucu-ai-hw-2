@@ -1,0 +1,10 @@
+method: rescore
+iou_link: 0.45
+alpha: 0.7
+topk_ratio: 0.5
+enable_propagation: false
+prop_min_score: 0.25
+prop_min_len: 3
+max_gap: 2
+gap_decay: 0.85
+single_frame_decay: 0.96

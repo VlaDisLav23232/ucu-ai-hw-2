@@ -1,4 +1,4 @@
-"""Local in-repo experiment tracking, Ultralytics adaptation, aggregation, and plotting (§9, U0.7)."""
+"""Local in-repo experiment tracking, Ultralytics adaptation, aggregation, and plotting."""
 
 from vdet.tracking.aggregate import RESULTS_COLUMNS, aggregate_runs
 from vdet.tracking.run import RunLogger, make_run_id

@@ -1,4 +1,4 @@
-"""Class ontology, ID mappings, and competition constants (§2.3, §2.4)."""
+"""Class ontology, ID mappings, and competition constants."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ CLASS_COLORS_RGB: dict[int, tuple[int, int, int]] = {
     7: (0, 180, 216),    # motor - cyan
 }
 
-# Official split counts verified on local dataset (§2.1)
+# Official split counts verified on local dataset
 EXPECTED_SPLIT_FRAMES: dict[str, int] = {
     "train": 24_201,
     "val": 2_846,
@@ -74,7 +74,7 @@ EXPECTED_SPLIT_BOXES: dict[str, int] = {
     "val": 114_132,
 }
 
-# COCO evaluation defaults (§3.1)
+# COCO evaluation defaults
 DEFAULT_MAX_DETS: list[int] = [1, 10, 500]
 MAX_SUBMISSION_DETS: int = 500
 DEFAULT_SEED: int = 42

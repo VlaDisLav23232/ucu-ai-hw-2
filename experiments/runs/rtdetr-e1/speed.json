@@ -1,0 +1,14 @@
+{
+  "weights": "checkpoints/rtdetr-e1_best.pt",
+  "run_id": "rtdetr-e1",
+  "imgsz": 1280,
+  "batch": 1,
+  "fp16": true,
+  "warmup_frames": 20,
+  "timed_frames": 200,
+  "median_latency_ms": 113.414,
+  "mean_latency_ms": 113.674,
+  "p95_latency_ms": 117.362,
+  "fps": 8.82,
+  "gpu_type": "NVIDIA GeForce RTX 4050 Laptop GPU"
+}

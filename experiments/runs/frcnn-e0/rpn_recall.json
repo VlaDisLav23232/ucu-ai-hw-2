@@ -1,0 +1,10 @@
+{
+  "total_gt": 4937.0,
+  "total_gt_small": 1321.0,
+  "rpn_recall@300": 0.8489,
+  "rpn_small_recall@300": 0.7456,
+  "rpn_recall@1000": 0.8608,
+  "rpn_small_recall@1000": 0.7517,
+  "rpn_recall@2000": 0.8608,
+  "rpn_small_recall@2000": 0.7517
+}

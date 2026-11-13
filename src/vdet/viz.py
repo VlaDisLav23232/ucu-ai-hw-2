@@ -1,4 +1,4 @@
-"""Visual debugging utilities: GT/pred/ignore overlays, grids, clip strips, and cache comparisons (U0.3)."""
+"""Visual debugging utilities: GT/pred/ignore overlays, grids, clip strips, and cache comparisons."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def save_figure_under_budget(
     initial_dpi: int = 110,
     dpi: int | None = None,
 ) -> Path:
-    """Save a matplotlib figure as a PNG guaranteed to stay under `max_kb` KB (§5)."""
+    """Save a matplotlib figure as a PNG guaranteed to stay under `max_kb` KB."""
     p = Path(out_path)
     p.parent.mkdir(parents=True, exist_ok=True)
     start_dpi = int(dpi) if dpi is not None else int(initial_dpi)
@@ -203,7 +203,7 @@ def render_clip_strip(
     ncols: int = 6,
     thumb_long_side: int = 320,
 ) -> Path:
-    """Render 30 consecutive frames from a clip to inspect temporal box/ignore alignment (U0.3 #5)."""
+    """Render 30 consecutive frames from a clip to inspect temporal box/ignore alignment."""
     clip_rows = (
         manifest_df[manifest_df["clip"] == clip_name]
         .sort_values("frame")
@@ -271,7 +271,7 @@ def render_cache_vs_original(
     out_path: Path,
     thumb_long_side: int = 480,
 ) -> Path:
-    """Compare original image vs cached blur (and drop) with GT boxes overlaid (U0.3/U0.4)."""
+    """Compare original image vs cached blur (and drop) with GT boxes overlaid."""
     nrows = len(image_keys)
     ncols = 3 if (drop_cache_dir is not None and drop_cache_dir.exists()) else 2
     fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 4.2, nrows * 2.5))

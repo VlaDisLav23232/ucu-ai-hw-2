@@ -14,15 +14,15 @@
     },
     {
       "stage": "+ Multi-Model\nWBF Ensemble",
-      "AP": 0.290166
+      "AP": 0.310087
     },
     {
       "stage": "+ Tracklet\nScore Smoothing",
-      "AP": 0.299677
+      "AP": 0.316338
     },
     {
       "stage": "+ Gap\nPropagation",
-      "AP": 0.299962
+      "AP": 0.317799
     }
   ]
 }

@@ -1,4 +1,4 @@
-"""RunLogger: creates and manages local experiment run directories (§6.4, §9, U0.7)."""
+"""RunLogger: creates and manages local experiment run directories."""
 
 from __future__ import annotations
 
@@ -26,9 +26,31 @@ METRICS_COLUMNS: tuple[str, ...] = (
 
 
 def make_run_id(family: str, exp: str, timestamp: datetime | None = None) -> str:
-    """Format canonical run ID `<family>-<exp>-<YYYYMMDD-HHMM>` (§6.4)."""
+    """Format canonical run ID `<family>-<exp>-<YYYYMMDD-HHMM>`."""
     ts = (timestamp or datetime.now(timezone.utc)).strftime("%Y%m%d-%H%M")
     return f"{family}-{exp}-{ts}"
+
+
+def outcome_from_summary(summary: dict[str, Any]) -> str:
+    """One-line factual outcome of a finished run (val metrics, epochs, GPU-hours, FPS)."""
+    if summary.get("AP") in (None, ""):
+        return "Completed (no full validation; smoke test)."
+    parts = [f"val AP={float(summary['AP']):.4f}", f"AP50={float(summary['AP50']):.4f}",
+             f"APs={float(summary['APs']):.4f}", f"AR500={float(summary['AR500']):.4f}"]
+    for key, fmt in (("epochs_done", "epochs={}"), ("gpu_h", "gpu_h={}"), ("fps", "fps={}")):
+        if summary.get(key) not in (None, "", 0):
+            parts.append(fmt.format(summary[key]))
+    return "Completed: " + ", ".join(parts) + "."
+
+
+# Alternative key names used by the training engines -> canonical metrics.csv columns
+METRIC_ALIASES: dict[str, str] = {
+    "val_map50_95": "val_AP",
+    "val_map50": "val_AP50",
+    "val_map_small": "val_APs",
+    "train_box_loss": "loss_box",
+    "train_cls_loss": "loss_cls",
+}
 
 
 class RunLogger:
@@ -42,7 +64,6 @@ class RunLogger:
         seed: int = DEFAULT_SEED,
         hypothesis: str = "",
         parent_run: str = "",
-        unit: str = "",
         family: str = "",
         exp: str = "",
     ) -> None:
@@ -57,7 +78,6 @@ class RunLogger:
         self.seed = seed
         self.hypothesis = hypothesis or str(self.config.get("hypothesis", ""))
         self.parent_run = parent_run or str(self.config.get("parent_run", ""))
-        self.unit = unit or str(self.config.get("unit", ""))
         self.family = family or str(self.config.get("family", run_id.split("-")[0]))
         self.exp = exp or str(
             self.config.get("exp", run_id.split("-")[1] if "-" in run_id else "e0")
@@ -99,7 +119,7 @@ class RunLogger:
         change_vs_parent: str = "",
         outcome: str = "",
     ) -> Path:
-        """Write concise 2-5 line factual notes.md (§6.4)."""
+        """Write concise 2-5 line factual notes.md."""
         lines = [
             f"# Run `{self.run_id}`",
             f"- **Hypothesis:** {hypothesis}",
@@ -111,9 +131,12 @@ class RunLogger:
         return p
 
     def log_epoch(self, row: dict[str, Any] | None = None, **kwargs: Any) -> None:
-        """Append one epoch row to metrics.csv (§6.4)."""
+        """Append one epoch row to metrics.csv."""
         merged = dict(row or {})
         merged.update(kwargs)
+        for alias, col in METRIC_ALIASES.items():      # e.g. the torchvision trainer's key names
+            if alias in merged and merged.get(col, "") == "":
+                merged[col] = merged[alias]
         file_exists = self.metrics_csv_path.exists()
         out_row = {col: merged.get(col, "") for col in METRICS_COLUMNS}
         with self.metrics_csv_path.open("a", encoding="utf-8", newline="") as fh:
@@ -132,7 +155,7 @@ class RunLogger:
         outcome_note: str | None = None,
         extra_summary: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Write eval_val.json (if given), speed.json (if given), and summary.json (§6.4, §6.5)."""
+        """Write eval_val.json (if given), speed.json (if given), and summary.json."""
         if eval_metrics is not None:
             save_json(eval_metrics, self.eval_val_json_path)
         elif self.eval_val_json_path.exists():
@@ -180,7 +203,6 @@ class RunLogger:
 
         summary: dict[str, Any] = {
             "run_id": self.run_id,
-            "unit": self.unit,
             "family": self.family,
             "exp": self.exp,
             "parent_run": self.parent_run,
@@ -208,11 +230,10 @@ class RunLogger:
             summary.update(extra_summary)
 
         save_json(summary, self.summary_json_path)
-        if outcome_note:
-            self.write_notes(
-                hypothesis=self.hypothesis or "Experimental run.",
-                change_vs_parent=f"Parent: {self.parent_run or 'none'}",
-                outcome=outcome_note,
-            )
+        self.write_notes(
+            hypothesis=self.hypothesis or "Experimental run.",
+            change_vs_parent=f"Parent: {self.parent_run or 'none'}",
+            outcome=outcome_note or outcome_from_summary(summary),
+        )
         return summary
 

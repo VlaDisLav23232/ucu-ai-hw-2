@@ -1,38 +1,28 @@
-# Environments & Python artifacts
+# Python environment & build artifacts
 .venv/
 venv/
 __pycache__/
 *.py[cod]
-*$py.class
 *.egg-info/
-.eggs/
 build/
 dist/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
 .ipynb_checkpoints/
 
-# Competition data, caches, checkpoints, framework outputs, submissions
-data/
-cache/
-runs/
-checkpoints/
-submissions/
+# Large local data and outputs (produced by the notebooks; too big for git, back them up elsewhere)
+/data/
+/cache/
+/runs/
+/checkpoints/
+/submissions/
 
-# Weights & large binaries
+# Model weights (trained checkpoints live in /checkpoints/; COCO-pretrained weights are downloaded by Ultralytics)
 *.pt
 *.pth
-*.onnx
-*.engine
-*.ckpt
 
-# Large full prediction tables (keep slim predictions in experiments/runs/)
+# Prediction tables (full ones in /runs/; the slim copies in experiments/runs/ are also too large for git)
 *.parquet
-!experiments/runs/**/*slim*.parquet
 
-# OS / WSL artifacts
+# OS / editor artifacts
 *:Zone.Identifier
 .DS_Store
 Thumbs.db
-

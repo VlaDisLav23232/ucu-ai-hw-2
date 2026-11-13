@@ -1,4 +1,4 @@
-"""Torchvision training engine with AMP, warmup+cosine LR, time budget, resumable checkpoints, and U0.5 eval (U2.0)."""
+"""Torchvision training engine with AMP, warmup+cosine LR, time budget, resumable checkpoints, and official evaluation."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def evaluate_tv_on_loader(
     split: str = "val",
     source_tag: str = "tv",
 ) -> tuple[dict[str, Any], pd.DataFrame]:
-    """Run inference on `val_loader` (cached images), map boxes back to original resolution, and evaluate via U0.5."""
+    """Run inference on `val_loader` (cached images), map boxes back to original resolution, and evaluate with the official evaluator."""
     was_training = model.training
     model.eval()
 
@@ -166,7 +166,7 @@ def train_torchvision(
     resume_path: str | Path | None = None,
     evaluate_full_val: bool = False,
 ) -> dict[str, Any]:
-    """Train a Faster R-CNN (F1) or RetinaNet (F2) model under Protocol P0 with full local tracking (§7, §9, U2.0)."""
+    """Train a Faster R-CNN or RetinaNet model under Protocol P0 with full local tracking."""
     seed = int(config.get("seed", DEFAULT_SEED))
     seed_everything(seed)
 
@@ -234,7 +234,6 @@ def train_torchvision(
         seed=seed,
         hypothesis=str(config.get("hypothesis", "")),
         parent_run=str(config.get("parent_run", "")),
-        unit=str(config.get("unit", "U2.0")),
         family=family,
         exp=exp,
     )
@@ -246,6 +245,7 @@ def train_torchvision(
     printed_throughput = False
     budget_exhausted = False
 
+    n_oom_skipped = 0
     for epoch in range(start_epoch, epochs + 1):
         model.train()
         ep_t0 = time.perf_counter()
@@ -272,33 +272,45 @@ def train_torchvision(
                 for t in targets
             ]
 
-            optimizer.zero_grad(set_to_none=True)
-            with torch.amp.autocast(device_type=device.type, enabled=use_amp):
-                loss_dict = model(imgs_dev, tgts_dev)
-                if "loss_classifier" in loss_dict:
-                    # Faster R-CNN losses: loss_classifier, loss_box_reg, loss_objectness, loss_rpn_box_reg
-                    cls_l = loss_dict["loss_classifier"]
-                    box_l = loss_dict["loss_box_reg"]
-                    aux_l = loss_dict.get("loss_objectness", torch.tensor(0.0, device=device)) + loss_dict.get(
-                        "loss_rpn_box_reg", torch.tensor(0.0, device=device)
-                    )
-                else:
-                    # RetinaNet losses: classification, bbox_regression
-                    cls_l = loss_dict["classification"]
-                    box_l = loss_dict["bbox_regression"]
-                    aux_l = torch.tensor(0.0, device=device)
-                total_loss = cls_l + box_l + aux_l
+            try:
+                optimizer.zero_grad(set_to_none=True)
+                with torch.amp.autocast(device_type=device.type, enabled=use_amp):
+                    loss_dict = model(imgs_dev, tgts_dev)
+                    if "loss_classifier" in loss_dict:
+                        # Faster R-CNN losses: loss_classifier, loss_box_reg, loss_objectness, loss_rpn_box_reg
+                        cls_l = loss_dict["loss_classifier"]
+                        box_l = loss_dict["loss_box_reg"]
+                        aux_l = loss_dict.get("loss_objectness", torch.tensor(0.0, device=device)) + loss_dict.get(
+                            "loss_rpn_box_reg", torch.tensor(0.0, device=device)
+                        )
+                    else:
+                        # RetinaNet losses: classification, bbox_regression
+                        cls_l = loss_dict["classification"]
+                        box_l = loss_dict["bbox_regression"]
+                        aux_l = torch.tensor(0.0, device=device)
+                    total_loss = cls_l + box_l + aux_l
 
-            if not torch.isfinite(total_loss):
-                print(f"[warn] Non-finite loss at epoch {epoch} step {b_idx}: {loss_dict}, skipping batch.")
+                if not torch.isfinite(total_loss):
+                    print(f"[warn] Non-finite loss at epoch {epoch} step {b_idx}: {loss_dict}, skipping batch.")
+                    continue
+
+                scaler.scale(total_loss).backward()
+                if grad_clip_norm > 0:
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip_norm)
+                scaler.step(optimizer)
+                scaler.update()
+            except RuntimeError as exc:
+                if "out of memory" not in str(exc).lower():
+                    raise
+                n_oom_skipped += 1
+                print(f"[warn] GPU out of memory at epoch {epoch} step {b_idx}; batch skipped ({n_oom_skipped} so far).")
+                if n_oom_skipped > 50:
+                    raise
+                loss_dict = cls_l = box_l = aux_l = total_loss = None
+                optimizer.zero_grad(set_to_none=True)
+                torch.cuda.empty_cache()
                 continue
-
-            scaler.scale(total_loss).backward()
-            if grad_clip_norm > 0:
-                scaler.unscale_(optimizer)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=grad_clip_norm)
-            scaler.step(optimizer)
-            scaler.update()
 
             sum_total_loss += float(total_loss.detach().item())
             sum_box_loss += float(box_l.detach().item())

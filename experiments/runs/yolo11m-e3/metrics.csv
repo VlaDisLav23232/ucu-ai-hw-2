@@ -1,0 +1,2 @@
+epoch,gpu_time_h,lr,train_loss,loss_box,loss_cls,loss_dfl,val_AP,val_AP50,val_APs
+1,2.01911,0.0001229,3.97526,1.6314,1.15751,1.18635,0.22628,0.45895,0.0

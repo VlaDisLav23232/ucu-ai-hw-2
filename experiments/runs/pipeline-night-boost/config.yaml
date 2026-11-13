@@ -1,0 +1,118 @@
+run_id: pipeline-night-boost
+wbf_run_id: ensemble-wbf-boost
+rescore_run_id: temporal-rescore-boost
+wbf_sub_name: ensemble_wbf_boost.csv
+final_sub_name: pipeline_night_boost.csv
+also_update_pipeline_final_csv: true
+unit: U4.8
+family: pipeline
+exp: night_boost
+parent_run: rtdetr-e3-ft
+hypothesis: Combining fine-tuned RT-DETR-L (k=2), YOLO11m@1600, and YOLO11s-P2 (stride-4
+  tiny-object head) with multi-scale/flip TTA, SAHI native-resolution tiling, class-aware
+  WBF, and velocity-projected tracklet rescoring pushes AP significantly beyond 0.30.
+seed: 42
+models:
+- run_id: rtdetr-e3-ft
+  weights: checkpoints/rtdetr-e3-ft_best.pt
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 3.2
+- run_id: rtdetr-e3-tta
+  base_run_id: rtdetr-e3-ft
+  weights: checkpoints/rtdetr-e3-ft_best.pt
+  imgsz: 1280
+  batch: 2
+  tta: true
+  tta_scales:
+  - 1.0
+  - 1.15
+  tta_hflip: true
+  hflip_only_at_base_scale: true
+  wbf_weight: 3.5
+- run_id: yolo11m-e3
+  weights: checkpoints/yolo11m-e3_best.pt
+  imgsz: 1600
+  batch: 2
+  wbf_weight: 2.2
+- run_id: yolo11m-e3-tta
+  base_run_id: yolo11m-e3
+  weights: checkpoints/yolo11m-e3_best.pt
+  imgsz: 1600
+  batch: 2
+  tta: true
+  tta_scales:
+  - 1.0
+  - 1.15
+  tta_hflip: true
+  hflip_only_at_base_scale: true
+  wbf_weight: 2.5
+- run_id: yolo11s-p2
+  weights: checkpoints/yolo11s-p2_best.pt
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 1.8
+- run_id: yolo-e1-tiled
+  base_run_id: yolo-e1
+  weights: checkpoints/yolo-e1_best.pt
+  imgsz: 1280
+  batch: 4
+  tiling: true
+  slice_size: 960
+  overlap: 0.25
+  upscale_small_frames: true
+  wbf_weight: 1.8
+- run_id: rtdetr-e0
+  weights: checkpoints/rtdetr-e0_best.pt
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 2.5
+- run_id: rtdetr-e1
+  weights: checkpoints/rtdetr-e1_best.pt
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 2.2
+- run_id: rtdetr-e2
+  weights: checkpoints/rtdetr-e2_best.pt
+  imgsz: 1280
+  batch: 2
+  wbf_weight: 1.8
+- run_id: yolo-e1
+  weights: checkpoints/yolo-e1_best.pt
+  imgsz: 1600
+  batch: 2
+  wbf_weight: 1.5
+- run_id: yolo-e0
+  weights: checkpoints/yolo-e0_best.pt
+  imgsz: 1280
+  batch: 4
+  wbf_weight: 1.0
+- run_id: yolo-e2
+  weights: checkpoints/yolo-e2_best.pt
+  imgsz: 1280
+  batch: 4
+  wbf_weight: 0.8
+fusion:
+  method: wbf
+  iou_thr: 0.55
+  auto_select_class_wbf: true
+  skip_box_thr: 0.001
+  conf_type: avg
+  max_det: 500
+temporal:
+  method: rescore
+  iou_link: 0.45
+  alpha: 0.7
+  topk_ratio: 0.5
+  enable_propagation: true
+  prop_min_score: 0.25
+  prop_min_len: 3
+  max_gap: 2
+  gap_decay: 0.85
+  single_frame_decay: 0.96
+  use_velocity: true
+  small_box_bonus: 0.0
+  smooth_boxes: true
+  box_smooth_weight: 0.16
+use_class_wbf: false
+use_smooth_boxes: true

@@ -1,4 +1,4 @@
-"""Kaggle submission formatter, parser, and strict validator (§3.4, §6.6, U0.6)."""
+"""Kaggle submission formatter, parser, and strict validator."""
 
 from __future__ import annotations
 
@@ -14,6 +14,28 @@ from vdet.infer.predictors import empty_predictions_df
 from vdet.paths import P
 
 
+def _resolve_test_images_csv(test_images_csv: str | Path | None = None) -> Path:
+    """Robustly resolve test_images.csv across root, notebooks/, and data/ directories."""
+    if test_images_csv is not None:
+        candidate = Path(test_images_csv)
+        if candidate.exists():
+            return candidate
+    for candidate in (
+        P.test_images_csv,
+        P.root / "data" / "test_images.csv",
+        P.root / "test_images.csv",
+        Path("data/test_images.csv"),
+        Path("../data/test_images.csv"),
+        Path("test_images.csv"),
+        Path("../test_images.csv"),
+    ):
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        "test_images.csv could not be found in data/ or repository root."
+    )
+
+
 def to_csv(
     preds_df: pd.DataFrame,
     out_csv: str | Path,
@@ -21,7 +43,7 @@ def to_csv(
     max_dets: int = MAX_SUBMISSION_DETS,
     decimals: int = 2,
 ) -> Path:
-    """Write a prediction table (§6.3) to a competition submission CSV (§3.4, §6.6).
+    """Write a prediction table to a competition submission CSV.
 
     Parameters
     ----------
@@ -36,7 +58,7 @@ def to_csv(
     decimals : int
         Decimal precision for `x, y, w, h` (default 2).
     """
-    ref_csv = Path(test_images_csv) if test_images_csv is not None else P.test_images_csv
+    ref_csv = _resolve_test_images_csv(test_images_csv)
     ref_df = pd.read_csv(ref_csv)
 
     preds_by_key: dict[str, pd.DataFrame] = {}
@@ -75,7 +97,7 @@ def to_csv(
             if not (math.isfinite(bx) and math.isfinite(by) and math.isfinite(bw) and math.isfinite(bh)):
                 continue
 
-            # Clip to [0, img_w] x [0, img_h] (§2.4)
+            # Clip to [0, img_w] x [0, img_h]
             x1 = min(img_w, max(0.0, bx))
             y1 = min(img_h, max(0.0, by))
             x2 = min(img_w, max(0.0, bx + bw))
@@ -118,7 +140,7 @@ def to_csv(
 
 
 def from_csv(sub_csv: str | Path) -> pd.DataFrame:
-    """Parse a Kaggle submission CSV into a §6.3 prediction DataFrame."""
+    """Parse a Kaggle submission CSV into a prediction DataFrame."""
     df = pd.read_csv(sub_csv, dtype=str, keep_default_na=False)
     records: list[dict[str, Any]] = []
     for row in df.itertuples(index=False):
@@ -154,7 +176,7 @@ def validate(
     max_dets: int = MAX_SUBMISSION_DETS,
     bounds_tol_px: float = 1.0,
 ) -> dict[str, Any]:
-    """Strictly validate a submission CSV against all §3.4 and §6.6 contract rules.
+    """Strictly validate a submission CSV against all and contract rules.
 
     Raises `ValueError` with a descriptive message if any check fails.
     """
@@ -162,7 +184,7 @@ def validate(
     if not csv_path.exists():
         raise ValueError(f"Submission file does not exist: {csv_path}")
 
-    ref_path = Path(test_images_csv) if test_images_csv is not None else P.test_images_csv
+    ref_path = _resolve_test_images_csv(test_images_csv)
     ref_df = pd.read_csv(ref_path)
     sub_df = pd.read_csv(csv_path, dtype=str, keep_default_na=False)
 

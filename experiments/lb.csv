@@ -1,2 +1,8 @@
 run_id,submission_file,lb_public,date,notes
-
+yolo-e0,yolo-e0.csv,0.2048245495,2026-11-04,YOLO11s baseline @1280
+yolo-e1,yolo-e1.csv,0.2416734659,2026-11-04,YOLO11s @1600
+yolo-e2,yolo-e2.csv,0.2333096141,2026-11-05,YOLO11s CIoU+NWD loss
+rtdetr-e1,rtdetr-e1.csv,0.2681831718,2026-11-05,RT-DETR-L 600 queries
+ensemble-wbf,ensemble_wbf.csv,0.3028529310,2026-11-05,6-model WBF ensemble
+pipeline-final,pipeline_test.csv,0.3183880835,2026-11-05,6-model WBF + temporal; uploaded as pipeline_test.csv (run inferred from date and score order)
+pipeline-night-boost,pipeline_test_2.csv,0.3372810891,2026-11-06,12-input WBF + temporal (boosted pipeline); uploaded as pipeline_test_2.csv (run inferred from date and score order)

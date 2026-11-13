@@ -124,7 +124,7 @@ def get_gpu_info() -> dict[str, Any]:
 
 
 def get_env_metadata(seed: int = DEFAULT_SEED) -> dict[str, Any]:
-    """Collect full environment metadata required for env.json (§6.4)."""
+    """Collect full environment metadata required for env.json."""
     git_info = get_git_info()
     gpu_info = get_gpu_info()
 
@@ -204,9 +204,14 @@ def load_resolved_config(
     protocol_path: str | Path | None = None,
     cli_overrides: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Resolve layered configuration: protocol.yaml <- config_path <- cli_overrides (§12)."""
+    """Resolve layered configuration: protocol <- config_path <- cli_overrides."""
     proto_file = Path(protocol_path) if protocol_path else (P.configs / "protocol.yaml")
-    resolved: dict[str, Any] = load_yaml(proto_file) if proto_file.exists() else {}
+    if proto_file.exists():
+        resolved: dict[str, Any] = load_yaml(proto_file)
+    else:
+        from vdet.config import PROTOCOL  # protocol embedded in vdet.config
+
+        resolved = copy.deepcopy(PROTOCOL)
     if config_path is not None:
         cfg_file = Path(config_path)
         user_cfg = load_yaml(cfg_file)

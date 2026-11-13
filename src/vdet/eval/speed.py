@@ -1,4 +1,4 @@
-"""FPS benchmark protocol for Ultralytics (.pt) and Torchvision (.pth) models (§7, §10 M2–M3)."""
+"""FPS benchmark protocol for Ultralytics (.pt) and Torchvision (.pth) models."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def _preload_resized_frames(
     n_frames: int = 220,
     long_side: int = 1280,
 ) -> list[np.ndarray]:
-    """Pre-decode and resize `n_frames` val images to `long_side` in RAM so JPEG decode is excluded from timing (§7)."""
+    """Pre-decode and resize `n_frames` val images to `long_side` in RAM so JPEG decode is excluded from timing."""
     manifest_df = load_manifest()
     val_m = manifest_df[manifest_df["split"] == "val"].head(n_frames).reset_index(drop=True)
     frames_rgb: list[np.ndarray] = []
@@ -49,8 +49,12 @@ def benchmark_checkpoint_speed(
     timed: int = 200,
     fp16: bool = True,
     device: str | None = None,
+    config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Measure median latency and FPS over `timed` pre-decoded val frames after `warmup` frames (§7)."""
+    """Measure median latency and FPS over `timed` pre-decoded val frames after `warmup` frames.
+
+    Torchvision checkpoints need their model config: pass it as a dict (`config`) or a YAML path.
+    """
     w_path = Path(weights_path)
     dev_str = device or ("cuda" if torch.cuda.is_available() else "cpu")
     dev = torch.device(dev_str)
@@ -68,7 +72,9 @@ def benchmark_checkpoint_speed(
     if is_tv:
         ckpt = torch.load(w_path, map_location="cpu", weights_only=False)
         cfg = (
-            load_yaml(Path(config_path))
+            config
+            if config is not None
+            else load_yaml(Path(config_path))
             if config_path is not None
             else (ckpt.get("config", {"family": "faster_rcnn"}) if isinstance(ckpt, dict) else {"family": "faster_rcnn"})
         )

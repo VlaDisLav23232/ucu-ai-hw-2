@@ -1,4 +1,4 @@
-"""Per-clip, per-class IoU tracklet linking with optional camera-motion compensation (§10 U4.4)."""
+"""Per-clip, per-class IoU tracklet linking with constant-velocity box projection."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from vdet.temporal.motion import warp_boxes_xywh
 
 
 def pairwise_iou_xywh(boxes1: np.ndarray, boxes2: np.ndarray) -> np.ndarray:
@@ -76,16 +75,70 @@ class Tracklet:
         k = min(len(scores), k)
         return float(scores[:k].mean())
 
+    def project_box_xywh(self, target_frame_idx: int) -> np.ndarray:
+        """Project the last bounding box to `target_frame_idx` using constant-velocity kinematics."""
+        last = self.nodes[-1]
+        box = last.box_xywh.copy()
+        if len(self.nodes) < 2:
+            return box
+        prev = self.nodes[-2]
+        dt_prev = max(1, last.frame_idx - prev.frame_idx)
+        dt_next = max(1, int(target_frame_idx) - last.frame_idx)
+        if dt_prev > 3 or dt_next > 3:
+            return box
+
+        cx_last = last.box_xywh[0] + 0.5 * last.box_xywh[2]
+        cy_last = last.box_xywh[1] + 0.5 * last.box_xywh[3]
+        cx_prev = prev.box_xywh[0] + 0.5 * prev.box_xywh[2]
+        cy_prev = prev.box_xywh[1] + 0.5 * prev.box_xywh[3]
+
+        vx = (cx_last - cx_prev) / float(dt_prev)
+        vy = (cy_last - cy_prev) / float(dt_prev)
+        max_shift = 1.25 * max(float(last.box_xywh[2]), float(last.box_xywh[3]), 12.0)
+        dx = float(np.clip(vx * dt_next, -max_shift, max_shift))
+        dy = float(np.clip(vy * dt_next, -max_shift, max_shift))
+        box[0] += dx
+        box[1] += dy
+        return box
+
+
+def pairwise_similarity_xywh(
+    boxes1: np.ndarray,
+    boxes2: np.ndarray,
+    small_box_bonus: float = 0.08,
+) -> np.ndarray:
+    """Compute `(N, M)` pairwise IoU + small-object center-proximity bonus for tiny aerial boxes."""
+    iou = pairwise_iou_xywh(boxes1, boxes2)
+    if len(boxes1) == 0 or len(boxes2) == 0 or float(small_box_bonus) <= 0.0:
+        return iou
+
+    cx1 = boxes1[:, 0:1] + 0.5 * boxes1[:, 2:3]
+    cy1 = boxes1[:, 1:2] + 0.5 * boxes1[:, 3:4]
+    cx2 = (boxes2[:, 0] + 0.5 * boxes2[:, 2])[None, :]
+    cy2 = (boxes2[:, 1] + 0.5 * boxes2[:, 3])[None, :]
+
+    dist2 = (cx1 - cx2) ** 2 + (cy1 - cy2) ** 2
+    scale1 = np.maximum(boxes1[:, 2:3], boxes1[:, 3:4])
+    scale2 = np.maximum(boxes2[:, 2], boxes2[:, 3])[None, :]
+    mean_scale = np.maximum(8.0, 0.5 * (scale1 + scale2))
+
+    # Only apply soft center proximity bonus when both boxes have similar scale and are small (<48 px)
+    size_ratio = np.minimum(scale1, scale2) / (np.maximum(scale1, scale2) + 1e-6)
+    is_small = (mean_scale < 48.0).astype(np.float32)
+    prox = np.exp(-dist2 / (1.5 * (mean_scale**2))) * (size_ratio > 0.6).astype(np.float32) * is_small
+    return np.clip(iou + float(small_box_bonus) * prox, 0.0, 1.0).astype(np.float32)
+
 
 def link_clip_tracklets(
     clip_df: pd.DataFrame,
     clip_name: str,
     iou_thresh: float = 0.45,
     max_gap: int = 2,
-    homographies: dict[tuple[int, int], np.ndarray] | None = None,
+    use_velocity: bool = True,
+    small_box_bonus: float = 0.06,
     start_tracklet_id: int = 0,
 ) -> list[Tracklet]:
-    """Link detections in `clip_df` (must include `frame_idx`) per class into `Tracklet` objects (§10 U4.4)."""
+    """Link detections in `clip_df` (must include `frame_idx`) per class into `Tracklet` objects."""
     if clip_df.empty:
         return []
 
@@ -116,16 +169,13 @@ def link_clip_tracklets(
             matched_curr = np.zeros(n_curr, dtype=bool)
 
             if active and n_curr > 0:
-                # Project each active tracklet's last box forward to f_idx if homographies are available
                 prev_boxes = np.stack([t.last_node.box_xywh for t in active], axis=0)
-                if homographies:
-                    for t_i, trk in enumerate(active):
-                        last_f = trk.last_node.frame_idx
-                        H_Step = homographies.get((last_f, f_idx))
-                        if H_Step is not None:
-                            prev_boxes[t_i : t_i + 1] = warp_boxes_xywh(prev_boxes[t_i : t_i + 1], H_Step)
 
-                iou_mat = pairwise_iou_xywh(prev_boxes, boxes_curr)
+                iou_mat = pairwise_similarity_xywh(prev_boxes, boxes_curr, small_box_bonus=small_box_bonus)
+                if use_velocity:
+                    vel_boxes = np.stack([t.project_box_xywh(f_idx) for t in active], axis=0)
+                    vel_mat = pairwise_similarity_xywh(vel_boxes, boxes_curr, small_box_bonus=small_box_bonus)
+                    iou_mat = np.maximum(iou_mat, vel_mat)
                 # Weight IoU slightly by score consistency to break ties cleanly in crowds
                 matched_trk = np.zeros(len(active), dtype=bool)
                 # Greedy assignment in descending IoU order (above iou_thresh)

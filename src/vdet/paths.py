@@ -1,4 +1,4 @@
-"""Environment auto-detection and POSIX pathlib root resolution (§5, §8.1)."""
+"""Environment auto-detection and POSIX pathlib root resolution."""
 
 from __future__ import annotations
 
@@ -11,12 +11,12 @@ import yaml
 
 
 def find_repo_root(start: Path | None = None) -> Path:
-    """Locate the repository root directory containing pyproject.toml or PROJECT_BLUEPRINT.md."""
+    """Locate the repository root directory (the one containing pyproject.toml)."""
     current = (start or Path(__file__)).resolve()
     if current.is_file():
         current = current.parent
     for parent in (current, *current.parents):
-        if (parent / "PROJECT_BLUEPRINT.md").exists() or (parent / "pyproject.toml").exists():
+        if (parent / "pyproject.toml").exists():
             return parent
     return Path.cwd().resolve()
 
@@ -113,18 +113,41 @@ class Paths:
         return f"Paths({items})"
 
 
+_LOCAL_DEFAULTS: dict[str, str] = {
+    "data": "data", "cache": "cache", "runs": "runs", "ckpt": "checkpoints",
+    "subs": "submissions", "experiments": "experiments", "images": "images",
+}
+
+# Per-environment defaults; environment variables VDET_DATA, VDET_CACHE, VDET_RUNS, VDET_CKPT,
+# VDET_SUBS, VDET_EXPERIMENTS and VDET_IMAGES always take precedence.
+ENV_PATH_DEFAULTS: dict[str, dict[str, str]] = {
+    "local_wsl": _LOCAL_DEFAULTS,
+    "kaggle": {
+        "data": "/kaggle/input/multiple-object-video-detection-hw-2-ucu-ai-2026",
+        "cache": "/kaggle/working/cache", "runs": "/kaggle/working/runs",
+        "ckpt": "/kaggle/working/checkpoints", "subs": "/kaggle/working/submissions",
+        "experiments": "experiments", "images": "images",
+    },
+    "colab": {
+        "data": "/content/data", "cache": "/content/cache", "runs": "/content/runs",
+        "ckpt": "/content/drive/MyDrive/vdet/checkpoints", "subs": "/content/submissions",
+        "experiments": "experiments", "images": "images",
+    },
+}
+
+
 def resolve_paths(env: str | None = None, repo_root: Path | None = None) -> Paths:
-    """Resolve all project paths from configs/paths.yaml and environment variables."""
+    """Resolve all project paths from per-environment defaults, an optional configs/paths.yaml override and env vars."""
     root = find_repo_root(repo_root)
     active_env = env or detect_env()
     configs_dir = root / "configs"
     paths_yaml = configs_dir / "paths.yaml"
 
-    cfg: dict[str, Any] = {}
+    cfg: dict[str, Any] = dict(ENV_PATH_DEFAULTS.get(active_env, _LOCAL_DEFAULTS))
     if paths_yaml.exists():
         with paths_yaml.open("r", encoding="utf-8") as fh:
             loaded = yaml.safe_load(fh) or {}
-            cfg = loaded.get(active_env, {})
+            cfg.update(loaded.get(active_env, {}))
 
     data_raw = os.environ.get("VDET_DATA") or cfg.get("data", "data")
     cache_raw = os.environ.get("VDET_CACHE") or cfg.get("cache", "cache")

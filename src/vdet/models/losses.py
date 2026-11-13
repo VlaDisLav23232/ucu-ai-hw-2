@@ -1,4 +1,9 @@
-"""Bounding-box regression losses: GIoU, CIoU, and Normalized Wasserstein Distance (NWD) (§10 F1-E2, F3-E2)."""
+"""Bounding-box regression losses: GIoU, CIoU, and Normalized Wasserstein Distance (NWD).
+
+Credits: GIoU — Rezatofighi et al., "Generalized Intersection over Union", CVPR 2019; CIoU — Zheng et al.,
+"Distance-IoU Loss", AAAI 2020; NWD — Wang et al., "A Normalized Gaussian Wasserstein Distance for Tiny
+Object Detection", arXiv:2110.13389, 2021.
+"""
 
 from __future__ import annotations
 

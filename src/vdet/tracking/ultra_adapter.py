@@ -1,4 +1,4 @@
-"""Convert Ultralytics results.csv and artifacts into the local RunLogger format (§9.2, U0.7)."""
+"""Convert Ultralytics results.csv and artifacts into the local RunLogger format."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def convert_ultralytics_results_csv(
     ultra_csv_path: str | Path,
     out_metrics_csv_path: str | Path | None = None,
 ) -> pd.DataFrame:
-    """Convert an Ultralytics `results.csv` into our standardized `metrics.csv` schema (§6.4, §9.2).
+    """Convert an Ultralytics `results.csv` into our standardized `metrics.csv` schema.
 
     Handles both single-column `time` (cumulative seconds in Ultralytics >=8.1 or per-epoch seconds)
     and standard loss/metric headers with stripped whitespace.

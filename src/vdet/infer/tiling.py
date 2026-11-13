@@ -1,4 +1,4 @@
-"""Model-agnostic SAHI-style sliced inference + full-frame merge (§10 U4.1).
+"""Model-agnostic SAHI-style sliced inference + full-frame merge.
 
 Credits: Inspired by SAHI (Akyon et al., "Slicing Aided Hyper Inference and Fine-Tuning for Small Object Detection", ICIP 2022).
 """
@@ -57,11 +57,17 @@ def compute_slice_windows(
     return [(x0, y0, x0 + sw, y0 + sh) for y0 in ys for x0 in xs]
 
 
+def _shm_dir() -> str | None:
+    shm = Path("/dev/shm")
+    return shm.as_posix() if shm.is_dir() else None
+
+
 class TiledPredictor(Predictor):
-    """Wraps any `Predictor` to run full-frame + overlapping tile passes and fuse them via WBF/NMS (§10 U4.1).
+    """Wraps any `Predictor` to run full-frame + overlapping tile passes and fuse them via WBF/NMS.
 
     Small frames (`min(W, H) < slice_size`, e.g., `680x382` or `960x540` test clips) are optionally
     upscaled `x2` before slicing so small objects occupy sufficient receptive field.
+    Processes tiles in memory-bounded chunks using `/dev/shm` when available.
     """
 
     def __init__(
@@ -76,6 +82,7 @@ class TiledPredictor(Predictor):
         tile_weight: float = 1.0,
         conf_thresh: float = 0.001,
         max_det: int = MAX_SUBMISSION_DETS,
+        chunk_size: int = 100,
         source_tag: str = "tiled",
     ) -> None:
         self.base_predictor = base_predictor
@@ -88,12 +95,14 @@ class TiledPredictor(Predictor):
         self.tile_weight = float(tile_weight)
         self.conf_thresh = float(conf_thresh)
         self.max_det = int(max_det)
+        self.chunk_size = max(1, int(chunk_size))
         self.source_tag = source_tag
 
     def predict(
         self,
         frames: pd.DataFrame | Sequence[str],
         data_root: Path | None = None,
+        full_preds_df: pd.DataFrame | None = None,
     ) -> pd.DataFrame:
         d_root = data_root or P.data
         if isinstance(frames, pd.DataFrame):
@@ -105,95 +114,108 @@ class TiledPredictor(Predictor):
         if m_sub.empty:
             return empty_predictions_df()
 
-        # 1. Full-frame pass
-        full_preds = self.base_predictor.predict(m_sub, data_root=d_root)
+        # 1. Full-frame pass (reuse precomputed if provided)
+        if full_preds_df is not None and not full_preds_df.empty:
+            valid_keys = set(m_sub["image_key"].astype(str))
+            full_preds = full_preds_df[full_preds_df["image_key"].isin(valid_keys)].reset_index(drop=True)
+        else:
+            full_preds = self.base_predictor.predict(m_sub, data_root=d_root)
 
-        # 2. Sliced pass using a temporary directory for cropped tiles
-        tile_rows: list[dict[str, object]] = []
-        tile_meta: dict[str, tuple[str, int, int, float, float, float]] = {}
+        # 2. Sliced pass in memory-bounded chunks using /dev/shm when available
+        mapped_frames: list[pd.DataFrame] = []
+        n_total = len(m_sub)
+        shm_base = _shm_dir()
 
-        with tempfile.TemporaryDirectory(prefix="vdet_tiles_") as tmp_dir_str:
-            tmp_dir = Path(tmp_dir_str)
-            for r in m_sub.itertuples(index=False):
-                img_path = d_root / str(r.path)
-                bgr = cv2.imread(img_path.as_posix(), cv2.IMREAD_COLOR)
-                if bgr is None:
-                    continue
-                orig_h, orig_w = bgr.shape[:2]
-                scale = 1.0
-                if self.upscale_small_frames and min(orig_w, orig_h) < self.slice_size:
-                    scale = 2.0
-                    bgr = cv2.resize(
-                        bgr,
-                        (int(orig_w * scale), int(orig_h * scale)),
-                        interpolation=cv2.INTER_LINEAR,
+        for c_start in range(0, n_total, self.chunk_size):
+            c_sub = m_sub.iloc[c_start : c_start + self.chunk_size].reset_index(drop=True)
+            tile_rows: list[dict[str, object]] = []
+            tile_meta: dict[str, tuple[str, int, int, float, float, float]] = {}
+
+            with tempfile.TemporaryDirectory(prefix="vdet_tiles_", dir=shm_base) as tmp_dir_str:
+                tmp_dir = Path(tmp_dir_str)
+                for r in c_sub.itertuples(index=False):
+                    img_path = d_root / str(r.path)
+                    bgr = cv2.imread(img_path.as_posix(), cv2.IMREAD_COLOR)
+                    if bgr is None:
+                        continue
+                    orig_h, orig_w = bgr.shape[:2]
+                    scale = 1.0
+                    if self.upscale_small_frames and min(orig_w, orig_h) < self.slice_size:
+                        scale = 2.0
+                        bgr = cv2.resize(
+                            bgr,
+                            (int(orig_w * scale), int(orig_h * scale)),
+                            interpolation=cv2.INTER_LINEAR,
+                        )
+
+                    work_h, work_w = bgr.shape[:2]
+                    windows = compute_slice_windows(
+                        work_w,
+                        work_h,
+                        slice_w=self.slice_size,
+                        slice_h=self.slice_size,
+                        overlap_ratio=self.overlap_ratio,
                     )
+                    for t_idx, (x1, y1, x2, y2) in enumerate(windows):
+                        crop = bgr[y1:y2, x1:x2]
+                        t_key = f"{r.image_key}__tile{t_idx}"
+                        rel_path = f"{t_key}.jpg"
+                        cv2.imwrite(
+                            (tmp_dir / rel_path).as_posix(),
+                            crop,
+                            [int(cv2.IMWRITE_JPEG_QUALITY), 95],
+                        )
+                        tile_rows.append(
+                            {
+                                "image_key": t_key,
+                                "path": rel_path,
+                                "width": int(x2 - x1),
+                                "height": int(y2 - y1),
+                            }
+                        )
+                        tile_meta[t_key] = (str(r.image_key), x1, y1, scale, float(orig_w), float(orig_h))
 
-                work_h, work_w = bgr.shape[:2]
-                windows = compute_slice_windows(
-                    work_w,
-                    work_h,
-                    slice_w=self.slice_size,
-                    slice_h=self.slice_size,
-                    overlap_ratio=self.overlap_ratio,
+                if not tile_rows:
+                    continue
+
+                tile_manifest = pd.DataFrame(tile_rows)
+                raw_tile_preds = self.base_predictor.predict(tile_manifest, data_root=tmp_dir)
+
+            if raw_tile_preds.empty:
+                continue
+
+            # Map tile predictions back to original frame coordinates
+            for t_key, sub in raw_tile_preds.groupby("image_key", sort=False):
+                meta = tile_meta.get(str(t_key))
+                if meta is None:
+                    continue
+                orig_key, off_x, off_y, scale, orig_w, orig_h = meta
+                raw_xywh = np.stack(
+                    [
+                        (sub["x"].to_numpy(dtype=np.float64) + off_x) / scale,
+                        (sub["y"].to_numpy(dtype=np.float64) + off_y) / scale,
+                        sub["w"].to_numpy(dtype=np.float64) / scale,
+                        sub["h"].to_numpy(dtype=np.float64) / scale,
+                    ],
+                    axis=1,
                 )
-                for t_idx, (x1, y1, x2, y2) in enumerate(windows):
-                    crop = bgr[y1:y2, x1:x2]
-                    t_key = f"{r.image_key}__tile{t_idx}"
-                    rel_path = f"{t_key}.jpg"
-                    cv2.imwrite((tmp_dir / rel_path).as_posix(), crop)
-                    tile_rows.append(
+                clipped_xywh, valid = clip_and_filter_boxes_xywh(raw_xywh, orig_w, orig_h)
+                if not np.any(valid):
+                    continue
+                mapped_frames.append(
+                    pd.DataFrame(
                         {
-                            "image_key": t_key,
-                            "path": rel_path,
-                            "width": int(x2 - x1),
-                            "height": int(y2 - y1),
+                            "image_key": orig_key,
+                            "cls": sub["cls"].to_numpy(dtype=np.int8)[valid],
+                            "score": sub["score"].to_numpy(dtype=np.float32)[valid],
+                            "x": clipped_xywh[:, 0],
+                            "y": clipped_xywh[:, 1],
+                            "w": clipped_xywh[:, 2],
+                            "h": clipped_xywh[:, 3],
+                            "source": self.source_tag,
                         }
                     )
-                    tile_meta[t_key] = (str(r.image_key), x1, y1, scale, float(orig_w), float(orig_h))
-
-            if not tile_rows:
-                return full_preds
-
-            tile_manifest = pd.DataFrame(tile_rows)
-            raw_tile_preds = self.base_predictor.predict(tile_manifest, data_root=tmp_dir)
-
-        if raw_tile_preds.empty:
-            return full_preds
-
-        # Map tile predictions back to original frame coordinates
-        mapped_frames: list[pd.DataFrame] = []
-        for t_key, sub in raw_tile_preds.groupby("image_key", sort=False):
-            meta = tile_meta.get(str(t_key))
-            if meta is None:
-                continue
-            orig_key, off_x, off_y, scale, orig_w, orig_h = meta
-            raw_xywh = np.stack(
-                [
-                    (sub["x"].to_numpy(dtype=np.float64) + off_x) / scale,
-                    (sub["y"].to_numpy(dtype=np.float64) + off_y) / scale,
-                    sub["w"].to_numpy(dtype=np.float64) / scale,
-                    sub["h"].to_numpy(dtype=np.float64) / scale,
-                ],
-                axis=1,
-            )
-            clipped_xywh, valid = clip_and_filter_boxes_xywh(raw_xywh, orig_w, orig_h)
-            if not np.any(valid):
-                continue
-            mapped_frames.append(
-                pd.DataFrame(
-                    {
-                        "image_key": orig_key,
-                        "cls": sub["cls"].to_numpy(dtype=np.int8)[valid],
-                        "score": sub["score"].to_numpy(dtype=np.float32)[valid],
-                        "x": clipped_xywh[:, 0],
-                        "y": clipped_xywh[:, 1],
-                        "w": clipped_xywh[:, 2],
-                        "h": clipped_xywh[:, 3],
-                        "source": self.source_tag,
-                    }
                 )
-            )
 
         if not mapped_frames:
             return full_preds

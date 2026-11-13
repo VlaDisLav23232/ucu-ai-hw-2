@@ -1,0 +1,43 @@
+seed: 42
+cache: k5_drop_L1920
+k: 5
+imgsz: 1280
+min_size: 720
+max_size: 1280
+num_classes: 9
+trainable_backbone_layers: 3
+batch: 2
+workers: 2
+epochs: 8
+time_budget_h: 1.5
+optimizer: sgd
+lr: 0.005
+momentum: 0.9
+weight_decay: 0.0001
+warmup_epochs: 1.0
+grad_clip_norm: 10.0
+augmentation:
+  hflip: 0.5
+  scale_min: 0.5
+  scale_max: 1.0
+  hsv_h: 0.015
+  hsv_s: 0.4
+  hsv_v: 0.3
+inference:
+  conf_thresh: 0.001
+  nms_iou: 0.6
+  max_det: 500
+  slim_conf_thresh: 0.05
+run_id: frcnn-e0
+family: faster_rcnn
+exp: e0
+parent_run: ''
+hypothesis: COCO-pretrained Faster R-CNN ResNet50-FPN v2 baseline (min_size=720, max_size=1280,
+  500 dets/img, 1.5 GPU-h budget).
+rpn_pre_nms_top_n_train: 2000
+rpn_pre_nms_top_n_test: 1000
+rpn_post_nms_top_n_train: 2000
+rpn_post_nms_top_n_test: 1000
+box_batch_size_per_image: 512
+box_positive_fraction: 0.25
+roi_box_loss: smooth_l1

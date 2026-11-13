@@ -1,4 +1,8 @@
-"""Small, unit-tested overrides for Torchvision Faster R-CNN (F1) and RetinaNet (F2) (§10 F1-E2, F2-E2)."""
+"""Small overrides for Torchvision Faster R-CNN and RetinaNet.
+
+Credits: built on torchvision's detection models (Ren et al., "Faster R-CNN", NeurIPS 2015; Lin et al.,
+"Focal Loss for Dense Object Detection", ICCV 2017); GIoU loss — Rezatofighi et al., CVPR 2019.
+"""
 
 from __future__ import annotations
 
@@ -51,7 +55,7 @@ def giou_fastrcnn_loss(
     regression_targets: list[torch.Tensor],
     box_coder_weights: tuple[float, float, float, float] = (10.0, 10.0, 5.0, 5.0),
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Drop-in replacement for `torchvision.models.detection.roi_heads.fastrcnn_loss` using GIoU box loss (§10 F1-E2)."""
+    """Drop-in replacement for `torchvision.models.detection.roi_heads.fastrcnn_loss` using GIoU box loss."""
     labels_cat = torch.cat(labels, dim=0)
     reg_targets_cat = torch.cat(regression_targets, dim=0)
 
@@ -77,7 +81,7 @@ def giou_fastrcnn_loss(
 
 
 def patch_frcnn_giou_loss(model: torch.nn.Module) -> torch.nn.Module:
-    """Patch a `FasterRCNN` instance so `roi_heads.forward` computes GIoU regression loss (§10 F1-E2)."""
+    """Patch a `FasterRCNN` instance so `roi_heads.forward` computes GIoU regression loss."""
     roi_heads = model.roi_heads
     weights = tuple(float(w) for w in roi_heads.box_coder.weights)
 
@@ -130,7 +134,7 @@ def patch_retinanet_focal_and_matcher(
     bg_iou_thresh: float = 0.3,
     box_loss_type: str | None = None,
 ) -> torch.nn.Module:
-    """Patch a `RetinaNet` instance with custom Focal Loss `(alpha, gamma)` and anchor Matcher IoU thresholds (§10 F2-E2)."""
+    """Patch a `RetinaNet` instance with custom Focal Loss `(alpha, gamma)` and anchor Matcher IoU thresholds."""
     alpha = float(focal_alpha)
     gamma = float(focal_gamma)
 
@@ -192,7 +196,7 @@ def compute_rpn_proposal_recall(
     iou_thresh: float = 0.5,
     max_batches: int | None = 50,
 ) -> dict[str, float]:
-    """Compute RPN class-agnostic proposal recall@K (overall and small objects <32^2 px) for F1 diagnostics (§10 F1)."""
+    """Compute RPN class-agnostic proposal recall@K (overall and small objects <32^2 px) for F1 diagnostics."""
     was_training = model.training
     model.eval()
     dev = torch.device(device)

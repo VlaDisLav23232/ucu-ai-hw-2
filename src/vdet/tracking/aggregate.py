@@ -1,4 +1,4 @@
-"""Aggregate `experiments/runs/*/summary.json` and `experiments/lb.csv` into `experiments/results.csv` (§6.5, U0.7)."""
+"""Aggregate `experiments/runs/*/summary.json` and `experiments/lb.csv` into `experiments/results.csv`."""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from vdet.utils import load_json
 
 RESULTS_COLUMNS: tuple[str, ...] = (
     "run_id",
-    "unit",
     "family",
     "exp",
     "parent_run",

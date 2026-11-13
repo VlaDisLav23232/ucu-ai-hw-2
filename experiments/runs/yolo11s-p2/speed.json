@@ -1,0 +1,14 @@
+{
+  "weights": "checkpoints/yolo11s-p2_best.pt",
+  "run_id": "yolo11s-p2",
+  "imgsz": 1280,
+  "batch": 1,
+  "fp16": true,
+  "warmup_frames": 20,
+  "timed_frames": 200,
+  "median_latency_ms": 25.986,
+  "mean_latency_ms": 26.054,
+  "p95_latency_ms": 27.128,
+  "fps": 38.48,
+  "gpu_type": "NVIDIA GeForce RTX 4050 Laptop GPU"
+}
