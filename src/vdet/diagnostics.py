@@ -24,6 +24,12 @@ from vdet.tracking.plots import (
 from vdet.utils import save_json, timer
 
 EXCLUDED_EXPS = ("smoke", "u12_blur", "u12_drop")
+# baseline + best tuned run of each family, and the final pipelines (used by the summary figures)
+KEY_RUNS = ["frcnn-e0", "frcnn-e2", "retina-e0", "retina-e3", "yolo-e0", "yolo-e1",
+            "rtdetr-e0", "rtdetr-e1", "pipeline-night-boost", "pipeline-v3"]
+
+
+FAMILY_TITLES = {"yolo": "YOLO11", "rtdetr": "RT-DETR-L", "faster_rcnn": "Faster R-CNN", "retinanet": "RetinaNet"}
 
 
 def load_results() -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -39,8 +45,10 @@ def make_summary_figures() -> None:
     df, eval_df = load_results()
     with timer("Summary figures (size_breakdown, map_vs_fps, per_class_ap, curves)"):
         if not eval_df.empty:
-            size_breakdown(eval_df, P.images / "size_breakdown.png")
-            per_class_ap(eval_df, P.images / "per_class_ap.png")
+            key_df = eval_df.set_index("run_id").reindex(
+                [r for r in KEY_RUNS if r in set(eval_df["run_id"])]).reset_index()
+            size_breakdown(key_df, P.images / "size_breakdown.png")
+            per_class_ap(key_df, P.images / "per_class_ap.png")
             fps_df = eval_df[eval_df["fps"].notna() & (pd.to_numeric(eval_df["fps"], errors="coerce") > 0)]
             if not fps_df.empty:
                 map_vs_fps(fps_df, P.images / "map_vs_fps.png")
@@ -55,7 +63,8 @@ def make_summary_figures() -> None:
                 if mp.exists():
                     fam_runs[str(rid)] = pd.read_csv(mp)
             if fam_runs:
-                curves(fam_runs, P.images / f"curves_{fam}.png")
+                curves(fam_runs, P.images / f"curves_{fam}.png",
+                       title=f"{FAMILY_TITLES[fam]}: training loss and proxy validation mAP")
 
         ultra_curves = {}
         for rid in ["yolo-e0", "yolo-e1", "yolo-e2", "rtdetr-e0", "rtdetr-e1", "rtdetr-e2"]:
@@ -70,19 +79,20 @@ def make_summary_figures() -> None:
 def make_tide_and_failure_figures() -> dict[str, Any]:
     """TIDE breakdown + failure gallery for the best run of each family."""
     tide_summary: dict[str, object] = {}
+    # best val run of each family (first candidate whose predictions exist)
     for fam_tag, candidate_rids in [
         ("yolo", ["yolo-e1", "yolo-e0"]),
         ("rtdetr", ["rtdetr-e0", "rtdetr-e1"]),
         ("faster_rcnn", ["frcnn-e2", "frcnn-e1", "frcnn-e0"]),
-        ("retinanet", ["retina-e2", "retina-e1", "retina-e0"]),
-        ("pipeline", ["pipeline-final", "ensemble-wbf"]),
+        ("retinanet", ["retina-e0", "retina-e3"]),
+        ("pipeline", ["pipeline-v3", "pipeline-night-boost", "pipeline-final"]),
     ]:
         chosen_parquet = None
         chosen_rid = None
         for rid in candidate_rids:
             for cand in [
+                P.runs / rid / "preds_val_final.parquet",
                 P.runs / rid / "preds_val.parquet",
-                P.runs / "pipeline-final" / "preds_val_final.parquet" if rid == "pipeline-final" else P.runs / rid / "preds_val.parquet",
                 P.exp_runs_dir / rid / "preds_val_slim.parquet",
             ]:
                 if cand.exists():
@@ -100,7 +110,7 @@ def make_tide_and_failure_figures() -> dict[str, Any]:
             tide_res = compute_tide_breakdown(preds_df, split="val", conf_thresh=0.20, top_k_per_frame=100)
             tide_summary[chosen_rid] = tide_res
             plot_tide_breakdown(tide_res, f"{chosen_rid} ({fam_tag})", P.images / f"tide_{fam_tag}.png")
-            plot_failure_gallery(preds_df, f"{chosen_rid} ({fam_tag})", P.images / f"failures_{fam_tag}.png")
+            plot_failure_gallery(preds_df, f"{chosen_rid} ({fam_tag})", P.images / f"failures_{fam_tag}.jpg")
 
     if tide_summary:
         save_json(tide_summary, P.experiments / "tide_breakdown_summary.json")

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import cv2
+import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -265,52 +266,183 @@ def plot_tide_breakdown(
     return save_figure_under_budget(fig, out_path)
 
 
+def _frame_error_types(
+    p_sub: pd.DataFrame, g_sub: pd.DataFrame, pos_iou: float = 0.50, bg_iou: float = 0.10
+) -> tuple[list[str], list[int], np.ndarray]:
+    """Per-frame TIDE labels: (type of each prediction, closest GT class or -1, matched mask of GT).
+
+    Same rules as `compute_tide_breakdown`; predictions must be sorted by score (descending).
+    """
+    g_boxes = g_sub[["x", "y", "w", "h"]].to_numpy(dtype=np.float64)
+    g_cls = g_sub["cls"].to_numpy(dtype=np.int64)
+    gt_matched = np.zeros(len(g_boxes), dtype=bool)
+    if p_sub.empty:
+        return [], [], gt_matched
+    p_boxes = p_sub[["x", "y", "w", "h"]].to_numpy(dtype=np.float64)
+    p_cls = p_sub["cls"].to_numpy(dtype=np.int64)
+    if len(g_boxes) == 0:
+        return ["Bkg"] * len(p_boxes), [-1] * len(p_boxes), gt_matched
+
+    iou_mat = pairwise_iou_xywh(p_boxes, g_boxes)
+    types: list[str] = []
+    near_cls: list[int] = []
+    for pi in range(len(p_boxes)):
+        ious = iou_mat[pi]
+        same_ious = np.where(g_cls == p_cls[pi], ious, -1.0)
+        gi = int(np.argmax(same_ious))
+        best_any = int(np.argmax(ious))
+        near_cls.append(int(g_cls[best_any]) if ious[best_any] >= bg_iou else -1)
+        if same_ious[gi] >= pos_iou:
+            types.append("Dupe" if gt_matched[gi] else "TP")
+            gt_matched[gi] = True
+        elif ious[best_any] >= pos_iou and g_cls[best_any] != p_cls[pi]:
+            types.append("Cls")
+        elif same_ious[gi] >= bg_iou:
+            types.append("Loc")
+        elif ious[best_any] >= bg_iou:
+            types.append("Both")
+        else:
+            types.append("Bkg")
+    return types, near_cls, gt_matched
+
+
+# colours (RGB) of the failure-gallery overlay
+_GALLERY_COLORS = {
+    "TP": (60, 200, 60),
+    "Miss": (255, 215, 0),
+    "Cls": (230, 40, 230),
+    "Loc": (255, 140, 0),
+    "Both": (255, 140, 0),
+    "Dupe": (150, 150, 150),
+    "Bkg": (235, 30, 30),
+}
+
+
+def _best_crop(centers: np.ndarray, w: int, h: int, frac: float = 0.34) -> tuple[int, int, int, int]:
+    """Crop window (x, y, cw, ch) of size frac*frame that contains the most of the given box centres."""
+    cw, ch = int(w * frac), int(h * frac)
+    best, best_xy = -1, (0, 0)
+    for x0 in np.linspace(0, w - cw, 13).astype(int):
+        for y0 in np.linspace(0, h - ch, 13).astype(int):
+            n = 0
+            if len(centers):
+                n = int(((centers[:, 0] >= x0) & (centers[:, 0] < x0 + cw)
+                         & (centers[:, 1] >= y0) & (centers[:, 1] < y0 + ch)).sum())
+            if n > best:
+                best, best_xy = n, (int(x0), int(y0))
+    return best_xy[0], best_xy[1], cw, ch
+
+
 def plot_failure_gallery(
     preds_df: pd.DataFrame,
     family_label: str,
     out_path: str | Path,
     split: str = "val",
+    conf_thresh: float = 0.30,
 ) -> Path:
-    """Render a 3-panel failure gallery (1: Missed Tiny Crowd, 2: Class Confusion Car/Van/Truck, 3: Background FP) (`images/failures_<family>.png`)."""
+    """Three failure cases mined from the predictions (`images/failures_<family>.jpg`).
+
+    Every val frame is labelled with the TIDE rules; the gallery shows the frame with the most
+    missed small objects, the frame with the most wrong-class detections and the frame with the most
+    background false positives (each from a different clip), as full frame + zoom on the worst region.
+    """
+    from vdet.viz import save_photo_figure
+
     manifest_df = load_manifest()
-    boxes_df = load_boxes()
+    gt_val = load_boxes()
+    gt_val = gt_val[gt_val["split"] == split]
     val_m = manifest_df[manifest_df["split"] == split].set_index("image_key")
-    gt_val = boxes_df[boxes_df["split"] == split]
 
-    # Pick 3 representative validation frames with high density / errors
-    sample_keys = gt_val.groupby("image_key").size().nlargest(15).index.tolist()
-    chosen_keys = [sample_keys[0], sample_keys[min(5, len(sample_keys) - 1)], sample_keys[min(10, len(sample_keys) - 1)]]
-    panel_titles = [
-        "Case 1: Dense Far-Field Tiny Objects (FN)",
-        "Case 2: Vehicle Class Confusion (Car/Van/Truck)",
-        "Case 3: Occlusion & Crowded Intersection",
-    ]
+    preds = preds_df[preds_df["score"] >= conf_thresh]
+    preds = filter_ignore_predictions(preds[preds["image_key"].isin(val_m.index)])
+    preds = preds.sort_values(["image_key", "score"], ascending=[True, False])
+    pred_groups = {str(k): g for k, g in preds.groupby("image_key", sort=False)}
+    gt_groups = {str(k): g for k, g in gt_val.groupby("image_key", sort=False)}
 
-    fig, axes = plt.subplots(1, 3, figsize=(9.6, 3.3))
-    for ax, key, p_title in zip(axes, chosen_keys, panel_titles):
-        row = val_m.loc[key]
-        bgr = cv2.imread((P.data / str(row["path"])).as_posix(), cv2.IMREAD_COLOR)
-        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB) if bgr is not None else np.zeros((540, 960, 3), dtype=np.uint8)
+    empty_p = preds.iloc[0:0]
+    rows = []
+    for key, g_sub in gt_groups.items():
+        p_sub = pred_groups.get(key, empty_p)
+        types, _, matched = _frame_error_types(p_sub, g_sub)
+        small = (g_sub["w"].to_numpy() * g_sub["h"].to_numpy()) < 32**2
+        rows.append({"image_key": key, "clip": val_m.loc[key, "clip"], "n_gt": len(g_sub),
+                     "miss": int((~matched).sum()), "miss_small": int((~matched & small).sum()),
+                     "Cls": types.count("Cls"), "Bkg": types.count("Bkg")})
+    stats = pd.DataFrame(rows)
 
-        # Draw GT in green, predictions in red
-        g_sub = gt_val[gt_val["image_key"] == key]
-        p_sub = preds_df[(preds_df["image_key"] == key) & (preds_df["score"] >= 0.30)]
+    cases = [("miss_small", "Missed small objects", "Miss"),
+             ("Cls", "Wrong class", "Cls"),
+             ("Bkg", "Background false positives", "Bkg")]
+    used_clips: set[str] = set()
+    fig, axes = plt.subplots(len(cases), 2, figsize=(14, 4.3 * len(cases)),
+                             gridspec_kw={"wspace": 0.03, "hspace": 0.18})
+    for r, (col, label, focus) in enumerate(cases):
+        cand = stats[~stats["clip"].isin(used_clips)].sort_values(col, ascending=False)
+        st = cand.iloc[0]
+        used_clips.add(st["clip"])
+        key = st["image_key"]
+        g_sub = gt_groups[key]
+        p_sub = pred_groups.get(key, empty_p)
+        types, near_cls, matched = _frame_error_types(p_sub, g_sub)
 
-        for r in g_sub.itertuples(index=False):
-            x1, y1, x2, y2 = int(r.x), int(r.y), int(r.x + r.w), int(r.y + r.h)
-            cv2.rectangle(rgb, (x1, y1), (x2, y2), (40, 220, 40), 2)
+        bgr = cv2.imread((P.data / str(val_m.loc[key, "path"])).as_posix(), cv2.IMREAD_COLOR)
+        img = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        h, w = img.shape[:2]
+        th = max(2, int(round(w / 900)))
 
-        for r in p_sub.itertuples(index=False):
-            x1, y1, x2, y2 = int(r.x), int(r.y), int(r.x + r.w), int(r.y + r.h)
-            cv2.rectangle(rgb, (x1, y1), (x2, y2), (240, 50, 50), 2)
+        def draw(box, kind):
+            x, y, bw, bh = (int(round(v)) for v in box)
+            cv2.rectangle(img, (x, y), (x + bw, y + bh), _GALLERY_COLORS[kind], th)
 
-        # Downscale for compact figure budget (<300 KB)
-        rgb_small = cv2.resize(rgb, (480, 270), interpolation=cv2.INTER_AREA)
-        ax.imshow(rgb_small)
-        ax.set_title(f"{p_title}\n({key}: GT=Green, Pred=Red)", fontsize=7.5)
-        ax.axis("off")
+        for box in g_sub.loc[~matched, ["x", "y", "w", "h"]].to_numpy():
+            draw(box, "Miss")
+        focus_centers = []
+        for box, kind in zip(p_sub[["x", "y", "w", "h"]].to_numpy(), types):
+            draw(box, kind)
+            if kind == focus:
+                focus_centers.append((box[0] + box[2] / 2, box[1] + box[3] / 2))
+        if focus == "Miss":
+            mb = g_sub.loc[~matched].copy()
+            mb = mb[(mb["w"] * mb["h"]) < 32**2]
+            focus_centers = list(zip(mb["x"] + mb["w"] / 2, mb["y"] + mb["h"] / 2))
+        cx, cy, cw, ch = _best_crop(np.array(focus_centers, dtype=np.float64).reshape(-1, 2), w, h)
 
-    fig.suptitle(f"Failure Case Analysis Gallery — {family_label}", fontsize=9.5, y=1.01)
-    fig.tight_layout()
-    return save_figure_under_budget(fig, out_path, dpi=110)
+        # label wrong-class boxes inside the crop: "predicted (true)"
+        if focus == "Cls":
+            for box, kind, gc, pc in zip(p_sub[["x", "y", "w", "h"]].to_numpy(), types, near_cls,
+                                         p_sub["cls"].to_numpy()):
+                if kind == "Cls" and cx <= box[0] < cx + cw and cy <= box[1] < cy + ch:
+                    txt = f"{CLASS_NAMES[pc]} ({CLASS_NAMES[gc]})"
+                    org = (int(box[0]), int(box[1]) - 2)
+                    (tw, tht), _ = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 0.22 * th, 1)
+                    cv2.rectangle(img, (org[0], org[1] - tht - 1), (org[0] + tw, org[1] + 1), (0, 0, 0), -1)
+                    cv2.putText(img, txt, org, cv2.FONT_HERSHEY_SIMPLEX, 0.22 * th, (255, 255, 255), 1, cv2.LINE_AA)
 
+        crop = img[cy:cy + ch, cx:cx + cw].copy()
+        full = img.copy()
+        cv2.rectangle(full, (cx, cy), (cx + cw, cy + ch), (255, 255, 255), th * 3)
+        scale = 1280.0 / max(w, h)
+        full = cv2.resize(full, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
+        axes[r, 0].imshow(full)
+        axes[r, 1].imshow(crop)
+        for ax in axes[r]:
+            ax.set_axis_off()
+        axes[r, 0].set_title(
+            f"Case {r + 1}: {label} | {key}\n"
+            f"{st['miss']}/{st['n_gt']} GT missed ({st['miss_small']} small), "
+            f"{st['Cls']} wrong-class, {st['Bkg']} background FPs",
+            fontsize=10, loc="left")
+        axes[r, 1].set_title("zoom on the white rectangle" + (" — labels: predicted (true)" if focus == "Cls" else ""),
+                             fontsize=10, loc="left")
+
+    handles = [patches.Patch(facecolor="none", edgecolor=np.array(c) / 255.0, linewidth=2, label=l)
+               for l, c in [("correct detection", _GALLERY_COLORS["TP"]), ("missed GT", _GALLERY_COLORS["Miss"]),
+                            ("wrong class", _GALLERY_COLORS["Cls"]), ("poor localisation", _GALLERY_COLORS["Loc"]),
+                            ("duplicate", _GALLERY_COLORS["Dupe"]), ("background FP", _GALLERY_COLORS["Bkg"])]]
+    fig.legend(handles=handles, loc="lower center", ncol=len(handles), fontsize=10, frameon=False,
+               bbox_to_anchor=(0.5, 0.0))
+    fig.suptitle(f"Failure cases — {family_label} (val, detections with score ≥ {conf_thresh:.2f})",
+                 fontsize=12, y=0.995)
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.95, bottom=0.04)
+    return save_photo_figure(fig, out_path)

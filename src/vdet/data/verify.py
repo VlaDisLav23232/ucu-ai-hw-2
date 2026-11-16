@@ -257,14 +257,16 @@ def export_u03_figures(
     images_dir: Path,
     cache_root: Path,
 ) -> list[Path]:
-    """Export all data-check figures to images/ (guaranteed <= 300 KB each)."""
+    """Export all data-check figures (photo grids, saved as JPEG) to images/."""
     saved: list[Path] = []
     annotated = manifest_df[manifest_df["split"].isin(["train", "val"])]
 
-    # 1. gt_grid_<bucket>.png (one per resolution bucket in train/val)
+    # 1. gt_grid_<bucket>.jpg (one per resolution bucket in train/val)
     for bucket, group in annotated.groupby("res_bucket"):
-        sample = group.sort_values("n_boxes", ascending=False).head(4)
-        out = images_dir / f"gt_grid_{bucket}.png"
+        # densest frame of up to 4 different clips (frames of one clip look almost identical)
+        sample = (group.sort_values("n_boxes", ascending=False)
+                  .groupby("clip", sort=False).head(1).head(4))
+        out = images_dir / f"gt_grid_{bucket}.jpg"
         render_frame_grid(
             sample,
             boxes_df[boxes_df["image_key"].isin(sample["image_key"])],
@@ -272,18 +274,18 @@ def export_u03_figures(
             data_root=data_root,
             out_path=out,
             ncols=2,
-            suptitle=f"GT + Ignore Grid — Resolution Bucket {bucket}",
+            suptitle=f"Ground truth (class-coloured) + ignore regions (hatched), resolution {bucket}",
         )
         saved.append(out)
 
-    # 2. ignore_worst_frames.png (top 6 frames with highest ignore_area_frac)
+    # 2. ignore_worst_frames.jpg (top 6 frames with highest ignore_area_frac)
     worst_ig = (
         annotated.sort_values("ignore_area_frac", ascending=False)
         .groupby("clip")
         .head(1)
         .head(6)
     )
-    out_worst = images_dir / "ignore_worst_frames.png"
+    out_worst = images_dir / "ignore_worst_frames.jpg"
     render_frame_grid(
         worst_ig,
         boxes_df[boxes_df["image_key"].isin(worst_ig["image_key"])],
@@ -291,14 +293,14 @@ def export_u03_figures(
         data_root=data_root,
         out_path=out_worst,
         ncols=3,
-        suptitle="Highest Ignore-Region Coverage Frames (One per Clip)",
+        suptitle="Frames with the largest ignore-region coverage (one per clip)",
     )
     saved.append(out_worst)
 
-    # 3. clip_strip_<clip>.png (30 consecutive frames from a dense validation clip)
+    # 3. clip_strip_<clip>.jpg (30 consecutive frames from a dense validation clip)
     val_clips = manifest_df[manifest_df["split"] == "val"]["clip"].unique()
     target_clip = str(val_clips[0]) if len(val_clips) > 0 else str(annotated["clip"].iloc[0])
-    out_strip = images_dir / f"clip_strip_{target_clip}.png"
+    out_strip = images_dir / f"clip_strip_{target_clip}.jpg"
     render_clip_strip(
         manifest_df,
         boxes_df,
@@ -311,7 +313,7 @@ def export_u03_figures(
     )
     saved.append(out_strip)
 
-    # 4. cache_vs_original.png (if k5_blur_L1920 cache exists)
+    # 4. cache_vs_original.jpg (if k5_blur_L1920 cache exists)
     blur_dir = cache_root / "k5_blur_L1920"
     drop_dir = cache_root / "k5_drop_L1920"
     if blur_dir.exists() and (blur_dir / "index.parquet").exists():
@@ -322,7 +324,7 @@ def export_u03_figures(
         ].sort_values("ignore_area_frac", ascending=False)
         sample_keys = cand.groupby("clip").head(1).head(3)["image_key"].tolist()
         if sample_keys:
-            out_cache = images_dir / "cache_vs_original.png"
+            out_cache = images_dir / "cache_vs_original.jpg"
             render_cache_vs_original(
                 sample_keys,
                 manifest_df,

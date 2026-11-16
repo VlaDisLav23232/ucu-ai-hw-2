@@ -1,27 +1,27 @@
 {
   "steps": [
     {
-      "stage": "F3 Baseline\n(YOLO11s @1280)",
+      "stage": "YOLO11s @1280\n(yolo-e0)",
       "AP": 0.206703
     },
     {
-      "stage": "+ Hi-Res 1600\n(yolo-e1)",
+      "stage": "YOLO11s @1600\n(yolo-e1)",
       "AP": 0.218362
     },
     {
-      "stage": "F4 Query-Based\n(RT-DETR-L)",
+      "stage": "RT-DETR-L\n(rtdetr-e0)",
       "AP": 0.265358
     },
     {
-      "stage": "+ Multi-Model\nWBF Ensemble",
+      "stage": "+ WBF ensemble\n(TTA, tiling)",
       "AP": 0.310087
     },
     {
-      "stage": "+ Tracklet\nScore Smoothing",
+      "stage": "+ tracklet\nscore smoothing",
       "AP": 0.316338
     },
     {
-      "stage": "+ Gap\nPropagation",
+      "stage": "+ gap filling\n(final)",
       "AP": 0.317799
     }
   ]

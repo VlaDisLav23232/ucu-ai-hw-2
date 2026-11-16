@@ -93,9 +93,13 @@ def plot_ignore_ablation(
     axes[0].set_xticks(x)
     axes[0].set_xticklabels(metrics_keys, fontsize=9)
     axes[0].set_ylabel("Validation Score")
-    axes[0].set_title("Official Holdout Accuracy (mAP / AP50 / AP_small)", fontsize=9.5)
+    axes[0].set_title("Val accuracy (mAP / AP50 / AP_small)", fontsize=9.5)
     axes[0].grid(True, axis="y", alpha=0.3)
-    axes[0].legend(fontsize=8)
+    axes[0].set_ylim(0, max(blur_vals + drop_vals) * 1.3)
+    axes[0].legend(fontsize=8, loc="upper right", ncol=1)
+    for xi, (bv, dv) in enumerate(zip(blur_vals, drop_vals)):
+        axes[0].text(xi - w / 2, bv, f"{bv:.3f}", ha="center", va="bottom", fontsize=7)
+        axes[0].text(xi + w / 2, dv, f"{dv:.3f}", ha="center", va="bottom", fontsize=7)
 
     # Right panel: Detections in 24px border ring around ignore regions
     axes[1].bar(
@@ -108,7 +112,7 @@ def plot_ignore_ablation(
     axes[1].set_title("Border-Zone Detection Share (conf ≥ 0.25)", fontsize=9.5)
     axes[1].grid(True, axis="y", alpha=0.3)
 
-    fig.suptitle("Ignore-Policy Ablation: GT-Protected Blur vs Drop", fontsize=10, y=1.02)
+    fig.suptitle("Ignore-region policy ablation (YOLO11s, same seed and budget): blur vs drop", fontsize=10)
     fig.tight_layout()
     save_figure_under_budget(fig, out_path)
 

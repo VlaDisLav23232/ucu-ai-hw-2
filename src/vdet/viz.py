@@ -58,6 +58,30 @@ def save_figure_under_budget(
     return p
 
 
+def add_class_legend(fig: plt.Figure, extra: Sequence[tuple[str, str]] = ()) -> None:
+    """Add a one-row legend of class box colours (plus optional (label, colour) entries) under the figure."""
+    handles = [patches.Patch(facecolor="none", edgecolor=np.array(CLASS_COLORS_RGB[c]) / 255.0,
+                             linewidth=2, label=ID_TO_CLASS[c]) for c in sorted(ID_TO_CLASS)]
+    handles += [patches.Patch(facecolor="none", edgecolor=col, linewidth=2, label=lbl) for lbl, col in extra]
+    fig.legend(handles=handles, loc="lower center", ncol=len(handles), fontsize=9,
+               frameon=False, bbox_to_anchor=(0.5, -0.03))
+
+
+def save_photo_figure(
+    fig: plt.Figure,
+    out_path: str | Path,
+    dpi: int = 150,
+    quality: int = 85,
+) -> Path:
+    """Save a figure made of photos as a JPEG (readable resolution, small file; PNG is too big for photos)."""
+    p = Path(out_path).with_suffix(".jpg")
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(p, dpi=dpi, bbox_inches="tight", pad_inches=0.06,
+                pil_kwargs={"quality": quality, "optimize": True})
+    plt.close(fig)
+    return p
+
+
 def draw_frame_annotations_ax(
     ax: plt.Axes,
     img_rgb: np.ndarray,
@@ -72,7 +96,7 @@ def draw_frame_annotations_ax(
     ax.imshow(img_rgb)
     ax.set_axis_off()
     if title:
-        ax.set_title(title, fontsize=8, pad=2)
+        ax.set_title(title, fontsize=8, pad=4)
 
     # 1. Hatched ignore regions
     if ignore_boxes is not None and not ignore_boxes.empty:
@@ -140,14 +164,14 @@ def render_frame_grid(
     out_path: Path,
     ncols: int = 2,
     suptitle: str | None = None,
-    max_Dim: int = 640,
+    max_Dim: int = 960,
 ) -> Path:
     """Render a grid of frames with GT and hatched ignore regions."""
     n = len(manifest_sub)
     if n == 0:
         raise ValueError("Empty manifest subset passed to render_frame_grid.")
     nrows = (n + ncols - 1) // ncols
-    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 4.5, nrows * 2.6))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 5.6, nrows * 3.4))
     axes_flat = np.atleast_1d(axes).ravel()
 
     boxes_by_key = {k: g for k, g in boxes_df.groupby("image_key")} if not boxes_df.empty else {}
@@ -187,9 +211,10 @@ def render_frame_grid(
         axes_flat[idx].set_axis_off()
 
     if suptitle:
-        fig.suptitle(suptitle, fontsize=10, y=1.01)
-    fig.tight_layout()
-    return save_figure_under_budget(fig, out_path)
+        fig.suptitle(suptitle, fontsize=11)
+    fig.tight_layout(h_pad=2.6)
+    add_class_legend(fig, extra=[("ignore region", (0.95, 0.8, 0.1))])
+    return save_photo_figure(fig, out_path)
 
 
 def render_clip_strip(
@@ -221,7 +246,7 @@ def render_clip_strip(
 
     total = len(clip_rows)
     nrows = (total + ncols - 1) // ncols
-    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 2.4, nrows * 1.45))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 2.8, nrows * 1.75))
     axes_flat = np.atleast_1d(axes).ravel()
 
     for idx, row in enumerate(clip_rows.itertuples(index=False)):
@@ -255,9 +280,9 @@ def render_clip_strip(
     for idx in range(total, len(axes_flat)):
         axes_flat[idx].set_axis_off()
 
-    fig.suptitle(f"Clip strip: {clip_name} ({total} consecutive frames)", fontsize=10, y=1.01)
+    fig.suptitle(f"Clip strip: {clip_name} ({total} consecutive frames)", fontsize=11)
     fig.tight_layout()
-    return save_figure_under_budget(fig, out_path)
+    return save_photo_figure(fig, out_path, dpi=130)
 
 
 def render_cache_vs_original(
@@ -269,12 +294,12 @@ def render_cache_vs_original(
     blur_cache_dir: Path,
     drop_cache_dir: Path | None,
     out_path: Path,
-    thumb_long_side: int = 480,
+    thumb_long_side: int = 800,
 ) -> Path:
     """Compare original image vs cached blur (and drop) with GT boxes overlaid."""
     nrows = len(image_keys)
     ncols = 3 if (drop_cache_dir is not None and drop_cache_dir.exists()) else 2
-    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 4.2, nrows * 2.5))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 5.0, nrows * 3.0))
     if nrows == 1:
         axes = np.expand_dims(axes, axis=0)
 
@@ -300,7 +325,7 @@ def render_cache_vs_original(
             if not df.empty:
                 df[["x", "y", "w", "h"]] *= s0
         draw_frame_annotations_ax(
-            axes[r, 0], img0, gt_boxes=b0, ignore_boxes=i0, title=f"Original: {key}"
+            axes[r, 0], img0, gt_boxes=b0, ignore_boxes=i0, title=f"Original (hatched = ignore): {key}"
         )
 
         # Col 1: Blur cache
@@ -320,7 +345,7 @@ def render_cache_vs_original(
             b1["w"] = b1["w"] * (bw / ow) * s1
             b1["h"] = b1["h"] * (bh / oh) * s1
         draw_frame_annotations_ax(
-            axes[r, 1], img1, gt_boxes=b1, ignore_boxes=None, title=f"Cache blur (GT preserved): {key}"
+            axes[r, 1], img1, gt_boxes=b1, ignore_boxes=None, title="Cache 'blur': ignore regions blurred, GT kept"
         )
 
         # Col 2: Drop cache (if present)
@@ -341,10 +366,11 @@ def render_cache_vs_original(
                 b2["w"] = b2["w"] * (dw / ow) * s2
                 b2["h"] = b2["h"] * (dh / oh) * s2
             draw_frame_annotations_ax(
-                axes[r, 2], img2, gt_boxes=b2, ignore_boxes=None, title=f"Cache drop: {key}"
+                axes[r, 2], img2, gt_boxes=b2, ignore_boxes=None, title="Cache 'drop': pixels unchanged"
             )
 
-    fig.suptitle("Original vs Cached Frames (GT-Protected Blur & Drop Policies)", fontsize=10, y=1.01)
-    fig.tight_layout()
-    return save_figure_under_budget(fig, out_path)
+    fig.suptitle("Original vs cached frames: 'blur' and 'drop' ignore-region policies", fontsize=11)
+    fig.tight_layout(h_pad=2.6)
+    add_class_legend(fig, extra=[("ignore region", (0.95, 0.8, 0.1))])
+    return save_photo_figure(fig, out_path)
 

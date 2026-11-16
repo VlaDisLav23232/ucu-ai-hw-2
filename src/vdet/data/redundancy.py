@@ -143,6 +143,7 @@ def generate_all_eda_figures(
     ]:
         clipped = np.clip(arr, 1.0, 250.0)
         ax_i.hist(clipped, bins=60, color="#457b9d", alpha=0.85, density=True)
+        ax_i.text(247, ax_i.get_ylim()[1] * 0.06, "≥250", ha="right", fontsize=7, color="#444")
         ax_i.axvline(32.0, color="#e63946", linestyle="--", linewidth=1.4, label="COCO Small (32 px)")
         ax_i.axvline(96.0, color="#f4a261", linestyle="--", linewidth=1.4, label="COCO Med/Large (96 px)")
         s_pct = 100.0 * float((arr < 32.0).mean())
@@ -152,7 +153,7 @@ def generate_all_eda_figures(
             f"{lbl}\nS: {s_pct:.1f}% | M: {m_pct:.1f}% | L: {l_pct:.1f}% (med={np.median(arr):.1f}px)",
             fontsize=9,
         )
-        ax_i.set_xlabel("Box Linear Size √(w·h) [pixels]")
+        ax_i.set_xlabel("Box size √(w·h) [px] (last bin: ≥250 px)")
         ax_i.set_ylabel("Density")
         ax_i.grid(True, alpha=0.3)
         ax_i.legend(fontsize=7)
@@ -174,10 +175,12 @@ def generate_all_eda_figures(
         patch.set_facecolor("#e76f51" if is_val else "#2a9d8f")
         patch.set_alpha(0.75)
     ax.axhline(100.0, color="#e63946", linestyle="--", linewidth=1.2, label="pycocotools default maxDets=100")
+    ax.bar(0, 0, color="#2a9d8f", alpha=0.75, label="train clip")
+    ax.bar(0, 0, color="#e76f51", alpha=0.75, label="val clip")
     ax.set_xticks(range(1, len(ordered_clips) + 1))
     ax.set_xticklabels(ordered_clips, rotation=90, fontsize=5.5)
     ax.set_ylabel("Labelled Boxes per Frame")
-    ax.set_title("Object Density per Sequence (Teal=Train, Orange=Val; Max=180/frame)", fontsize=9.5)
+    ax.set_title("Objects per frame in each sequence (box = IQR, whiskers = 1.5·IQR, outliers hidden; max 180)", fontsize=9.5)
     ax.grid(True, axis="y", alpha=0.3)
     ax.legend(fontsize=8)
     fig.tight_layout()
@@ -198,7 +201,11 @@ def generate_all_eda_figures(
     ax.set_yticklabels(CLASS_NAMES, fontsize=8)
     ax.set_xticks(range(len(ordered_clips)))
     ax.set_xticklabels(ordered_clips, rotation=90, fontsize=5.5)
-    ax.set_title("Per-Sequence Class Composition Heatmap (Row-Normalized Share)", fontsize=9.5)
+    ax.set_title("Class mix of each sequence (share of the sequence's boxes; each column sums to 1; val clips in orange)", fontsize=9.5)
+    val_set = set(manifest_df[manifest_df["split"] == "val"]["clip"])
+    for lbl in ax.get_xticklabels():
+        if lbl.get_text() in val_set:
+            lbl.set_color("#e76f51")
     fig.colorbar(im, ax=ax, fraction=0.02, pad=0.02, label="Class Share")
     fig.tight_layout()
     saved["clip_class_heatmap"] = save_figure_under_budget(
@@ -213,6 +220,7 @@ def generate_all_eda_figures(
         .reindex(columns=["train", "val", "test"], fill_value=0)
     )
     res_pct = 100.0 * res_table.div(res_table.sum(axis=0).replace(0, 1), axis=1)
+    res_pct = res_pct.loc[sorted(res_pct.index, key=lambda r: int(r.split("x")[0]) * int(r.split("x")[1]))]
 
     fig, ax = plt.subplots(figsize=(7.8, 3.8))
     rx = np.arange(len(res_pct))
@@ -223,7 +231,7 @@ def generate_all_eda_figures(
     ax.set_xticks(rx)
     ax.set_xticklabels(res_pct.index.tolist(), rotation=25, ha="right", fontsize=8)
     ax.set_ylabel("Share of Frames (%)")
-    ax.set_title("Frame Resolution Shift: Train/Val vs Downscaled Test Frames", fontsize=9.5)
+    ax.set_title("Frame resolutions per split (sorted by pixel count): test has small frames train never has", fontsize=9.5)
     ax.grid(True, axis="y", alpha=0.3)
     ax.legend(fontsize=8)
     fig.tight_layout()
@@ -241,7 +249,11 @@ def generate_all_eda_figures(
     ax.set_xticks(range(len(ordered_clips)))
     ax.set_xticklabels(ordered_clips, rotation=90, fontsize=5.5)
     ax.set_ylabel("Mean Ignore Area (% of Frame)")
-    ax.set_title("Deduplicated Ignore-Region Area Coverage per Sequence", fontsize=9.5)
+    ax.set_title("Mean share of the frame covered by ignore regions, per sequence (val clips in orange)", fontsize=9.5)
+    val_set = set(manifest_df[manifest_df["split"] == "val"]["clip"])
+    for lbl in ax.get_xticklabels():
+        if lbl.get_text() in val_set:
+            lbl.set_color("#e76f51")
     ax.grid(True, axis="y", alpha=0.3)
     fig.tight_layout()
     saved["ignore_coverage"] = save_figure_under_budget(fig, img_dir / "eda_ignore_coverage.png")

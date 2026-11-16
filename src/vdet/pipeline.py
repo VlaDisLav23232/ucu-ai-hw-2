@@ -425,12 +425,12 @@ def run_pipeline(
         # 6. Generate Waterfall Table & Plot (images/pipeline_waterfall.png)
         waterfall_steps: list[tuple[str, float]] = []
         for step_id, label in [
-            ("yolo-e0", "F3 Baseline\n(YOLO11s @1280)"),
-            ("yolo-e1", "+ Hi-Res 1600\n(yolo-e1)"),
-            ("rtdetr-e0", "F4 Query-Based\n(RT-DETR-L)"),
-            (wbf_run_id, "+ Multi-Model\nWBF Ensemble"),
-            (rescore_run_id, "+ Tracklet\nScore Smoothing"),
-            (pipe_run_id, "+ Gap\nPropagation"),
+            ("yolo-e0", "YOLO11s @1280\n(yolo-e0)"),
+            ("yolo-e1", "YOLO11s @1600\n(yolo-e1)"),
+            ("rtdetr-e0", "RT-DETR-L\n(rtdetr-e0)"),
+            (wbf_run_id, "+ WBF ensemble\n(TTA, tiling)"),
+            (rescore_run_id, "+ tracklet\nscore smoothing"),
+            (pipe_run_id, "+ gap filling\n(final)"),
         ]:
             s_path = P.exp_runs_dir / step_id / "summary.json"
             if s_path.exists():
