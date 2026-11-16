@@ -87,10 +87,20 @@ We separated the effects of data, inference and model changes:
 We ensembled the models using weighted boxes fusion which averages overlapping boxes from all models instead of discarding them. Even the weaker families added some gain, which shows that diversity matters.
 
 
-### Temporal post-processing (bonus).
+### Temporal post-processing
  Because we operate with frames from videos we can use tracking for double checking the detections. For each clip and class we link detections in consecutive frames into tracklets. Each score is then mixed with the tracklet's top scores, gaps of <= 2 frames are filled, and boxes are smoothed over 3 frames. This adds +0.008-0.009 AP consistently.
 
 ![From single models to the final pipeline](images/pipeline_waterfall.png)
+
+We built the pipeline in three versions and submitted each of them to Kaggle:
+
+| version | what is inside | val AP | public LB |
+|---|---|---|---|
+| v1 (pipeline-final) | 3 YOLO + 3 RT-DETR models, WBF + temporal | 0.300 | 0.318 |
+| v2 (pipeline-night-boost) | 12 inputs: v1 + bigger YOLO, P2 head, TTA and tiling | 0.313 | 0.337 |
+| v3 (pipeline-v3) | v2 + 3 Faster R-CNN models | 0.318 | 0.327 |
+
+For comparison, our single models scored 0.205-0.242 (YOLO) and 0.268 (RT-DETR) on the public LB. Interestingly v3 is the best on val but not on the LB. The public LB uses only part of the test clips, and we tuned the pipeline on the same 7 val clips, so we don't fully trust either number.
 
 
 
@@ -103,7 +113,7 @@ We ensembled the models using weighted boxes fusion which averages overlapping b
 
 ## 6. Final model and how to run
 
-Our final submission is pipeline-v3. Our final ensemble consists of three kinds of detectors - RT-DETR, YOLO, Faster R-CNN. Their output is then merged with wighted boxes fusion.
+Our final submission is pipeline-v3. Our final ensemble consists of three kinds of detectors - RT-DETR, YOLO, Faster R-CNN. Their output is then merged with wighted boxes fusion. It has 0.318 AP on val and 0.327 on the public leaderboard.
 
 How to run:
 1. Install requirements
@@ -114,7 +124,9 @@ pip install -r requirements.txt && pip install -e .
 ```
 
 2. Download data from Kaggle to the data folder
-3. Run all the notebooks in order, notebook 6 creates final submission
+3. Run all the notebooks in order, notebook 6 creates final submission (`submissions/pipeline_v3.csv`)
+
+We used seed 42 in every notebook and every run, so the results can be repeated. All other settings are written directly in the notebooks, and each run also saves its full config to `experiments/runs/<run_id>/config.yaml`.
 
 
 
@@ -122,3 +134,27 @@ pip install -r requirements.txt && pip install -e .
 
 
 Because the dataset consists of shots taken from air objects on frames are dense and tiny, that makes them difficult to detect. We saw that detector family matters. Evidence for that is that RT-DETR-L beat every CNN even though it had not fully converged. We made some tuning and the one that helped the most was raising input resolution and adding a stride-4 detection head, because tiny objects became bigger and got more grid cells, and therefore easier to detect. The largest gains came from ensembling three detector families and merging their results.
+
+## References
+
+Papers and tools we used ideas or code from:
+
+1. Ren et al. Faster R-CNN (2015) - https://arxiv.org/abs/1506.01497
+2. Lin et al. Feature Pyramid Networks (2017) - https://arxiv.org/abs/1612.03144
+3. Lin et al. Focal Loss / RetinaNet (2017) - https://arxiv.org/abs/1708.02002
+4. Redmon, Farhadi. YOLOv2, k-means anchors (2016) - https://arxiv.org/abs/1612.08242
+5. Feng et al. TOOD, task-aligned assigner (2021) - https://arxiv.org/abs/2108.07755
+6. Carion et al. DETR (2020) - https://arxiv.org/abs/2005.12872
+7. Zhao et al. RT-DETR (2023) - https://arxiv.org/abs/2304.08069
+8. Rezatofighi et al. GIoU (2019) - https://arxiv.org/abs/1902.09630
+9. Zheng et al. DIoU/CIoU (2019) - https://arxiv.org/abs/1911.08287
+10. Wang et al. Normalized Wasserstein Distance (2021) - https://arxiv.org/abs/2110.13389
+11. Solovyev et al. Weighted Boxes Fusion (2019) - https://arxiv.org/abs/1910.13302
+12. Akyon et al. SAHI, sliced inference (2022) - https://arxiv.org/abs/2202.06934
+13. Han et al. Seq-NMS (2016) - https://arxiv.org/abs/1602.08465
+14. Bolya et al. TIDE (2020) - https://arxiv.org/abs/2008.08115
+15. Zhu et al. VisDrone dataset (2020) - https://arxiv.org/abs/2001.06303
+16. Ultralytics (YOLO11 and RT-DETR training) - https://docs.ultralytics.com/
+17. TorchVision detection models and reference scripts - https://github.com/pytorch/vision/tree/main/references/detection
+18. faster-coco-eval (evaluation) - https://github.com/MiXaiLL76/faster_coco_eval
+19. ensemble-boxes (WBF implementation) - https://github.com/ZFTurbo/Weighted-Boxes-Fusion
